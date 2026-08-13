@@ -113,7 +113,6 @@ if menu == "📝 신규 주문 및 고객 등록":
                 "주문 상품명 (예: 생일 축하 꽃다발) *"
             )
             amount = st.number_input("결제 금액 (원)", step=10000, value=50000)
-            # 기본 픽업 날짜를 접속 당일(today)로 설정
             pickup_date = st.date_input("픽업 날짜 *", value=today)
             pickup_time = st.time_input("픽업 시간 *")
 
@@ -174,7 +173,6 @@ if menu == "📝 신규 주문 및 고객 등록":
 elif menu == "📅 픽업 일정 확인 (달력)":
     st.subheader("📅 월간 픽업 달력")
 
-    # 선택된 날짜 Session State 초기화 (기본값: 오늘)
     if "selected_calendar_date" not in st.session_state:
         st.session_state["selected_calendar_date"] = today
 
@@ -214,7 +212,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 요일 헤더
     cols_header = st.columns(7)
     days_name = ["일", "월", "화", "수", "목", "금", "토"]
     for i, h in enumerate(days_name):
@@ -223,7 +220,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             unsafe_allow_html=True,
         )
 
-    # 달력 날짜 버튼 생성
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
@@ -236,7 +232,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
                 if count > 0:
                     label += f"\n({count}건)"
 
-                # 클릭 시 선택 날짜 업데이트
                 if cols[i].button(label, key=f"btn_{day}"):
                     st.session_state["selected_calendar_date"] = day
             else:
@@ -244,7 +239,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
 
     st.write("---")
 
-    # 선택된 날짜 입력창 (버튼 클릭 시 자동 연동)
     selected_date = st.date_input(
         "🔍 상세 픽업 내역을 확인할 날짜 선택",
         value=st.session_state["selected_calendar_date"],
@@ -318,4 +312,4 @@ elif menu == "🔔 알림 발송 현황":
         )
         st.dataframe(df_1day, use_container_width=True)
     except Exception:
-        st.write("현재 발송 대상 알림이 없습니다.")ㄴ
+        st.write("현재 발송 대상 알림이 없습니다.")
