@@ -23,7 +23,7 @@ def format_phone(phone_str):
             return f"{nums[:3]}-{nums[3:6]}-{nums[6:]}"
     elif len(nums) == 8:
         return f"{nums[:4]}-{nums[4:]}"
-    return phone_str  # 그 외 형태는 그대로 반환
+    return phone_str
 
 
 # DB 연결 및 DB 호환성 자동 보정 함수
@@ -58,7 +58,6 @@ def init_db():
         )
     """)
 
-    # 기존 테이블 컬럼 점검 및 유연한 추가
     c.execute("PRAGMA table_info(orders)")
     columns = [col[1] for col in c.fetchall()]
 
@@ -92,11 +91,13 @@ menu = st.sidebar.radio(
     label_visibility="collapsed",
 )
 
+# 접속 기준 실시간 오늘 날짜
+today = datetime.now().date()
+
 # 1. 신규 주문 및 고객 등록
 if menu == "📝 신규 주문 및 고객 등록":
     st.subheader("📝 신규 주문 및 고객 등록")
 
-    # 오류 시에도 입력 데이터를 유지하기 위해 clear_on_submit=False 로 설정
     with st.form("order_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
 
@@ -112,7 +113,8 @@ if menu == "📝 신규 주문 및 고객 등록":
                 "주문 상품명 (예: 생일 축하 꽃다발) *"
             )
             amount = st.number_input("결제 금액 (원)", step=10000, value=50000)
-            pickup_date = st.date_input("픽업 날짜 *")
+            # 기본 픽업 날짜를 접속 당일(today)로 설정
+            pickup_date = st.date_input("픽업 날짜 *", value=today)
             pickup_time = st.time_input("픽업 시간 *")
 
         notes = st.text_area("고객 특이사항 / 메모")
@@ -122,13 +124,10 @@ if menu == "📝 신규 주문 및 고객 등록":
             if not name or not phone_input or not product_name:
                 st.error("이름, 휴대폰 번호, 상품명은 필수 입력 항목입니다.")
             else:
-                formatted_phone = format_phone(
-                    phone_input
-                )  # 전화번호 자동 변환
+                formatted_phone = format_phone(phone_input)
                 try:
                     c = conn.cursor()
 
-                    # 1) 고객 정보 업데이트 또는 신규 등록
                     c.execute(
                         "SELECT id FROM customers WHERE phone = ?",
                         (formatted_phone,),
@@ -148,7 +147,6 @@ if menu == "📝 신규 주문 및 고객 등록":
                         )
                         customer_id = c.lastrowid
 
-                    # 2) 주문 정보 등록 (product, product_name 컬럼 모두 지원)
                     pickup_datetime_str = f"{pickup_date} {pickup_time.strftime('%H:%M:%S')}"
                     c.execute(
                         """
@@ -172,11 +170,14 @@ if menu == "📝 신규 주문 및 고객 등록":
                 except Exception as e:
                     st.error(f"저장 중 오류가 발생했습니다: {e}")
 
-# 2. 픽업 일정 확인 (모바일 반응형 달력 UI)
+# 2. 픽업 일정 확인 (클릭 가능한 달력)
 elif menu == "📅 픽업 일정 확인 (달력)":
     st.subheader("📅 월간 픽업 달력")
 
-    today = datetime.now()
+    # 선택된 날짜 Session State 초기화 (기본값: 오늘)
+    if "selected_calendar_date" not in st.session_state:
+        st.session_state["selected_calendar_date"] = today
+
     col_y, col_m = st.columns(2)
     with col_y:
         year = st.number_input(
@@ -213,55 +214,47 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
+    # 요일 헤더
+    cols_header = st.columns(7)
+    days_name = ["일", "월", "화", "수", "목", "금", "토"]
+    for i, h in enumerate(days_name):
+        cols_header[i].markdown(
+            f"<div style='text-align: center; font-weight: bold;'>{h}</div>",
+            unsafe_allow_html=True,
+        )
+
+    # 달력 날짜 버튼 생성
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
-    html_code = """
-    <style>
-        .calendar-table { width: 100%; border-collapse: collapse; text-align: center; font-family: sans-serif; }
-        .calendar-table th { background-color: #f0f2f6; padding: 8px 0; font-size: 14px; border: 1px solid #ddd; }
-        .calendar-table td { width: 14.28%; height: 50px; vertical-align: top; border: 1px solid #eee; padding: 2px; font-size: 13px; }
-        .day-num { font-weight: bold; color: #333; }
-        .badge { background-color: #ff4b4b; color: white; border-radius: 8px; padding: 1px 4px; font-size: 10px; display: inline-block; margin-top: 2px; }
-        .other-month { color: #ccc; background-color: #fafafa; }
-    </style>
-    <table class="calendar-table">
-        <thead>
-            <tr>
-                <th style="color:red;">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th style="color:blue;">토</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-
     for week in month_days:
-        html_code += "<tr>"
-        for day in week:
+        cols = st.columns(7)
+        for i, day in enumerate(week):
             if day.month == month:
                 count = counts_by_date.get(day, 0)
-                badge_html = (
-                    f'<br><span class="badge">{count}건</span>'
-                    if count > 0
-                    else ""
-                )
-                html_code += f'<td><span class="day-num">{day.day}</span>{badge_html}</td>'
+                label = f"{day.day}일"
+                if count > 0:
+                    label += f"\n({count}건)"
+
+                # 클릭 시 선택 날짜 업데이트
+                if cols[i].button(label, key=f"btn_{day}"):
+                    st.session_state["selected_calendar_date"] = day
             else:
-                html_code += (
-                    f'<td class="other-month">{day.day}</td>'
-                )
-        html_code += "</tr>"
-
-    html_code += "</tbody></table>"
-
-    st.markdown(html_code, unsafe_allow_html=True)
-    st.write("")
-
-    selected_date = st.date_input(
-        "🔍 상세 픽업 내역을 확인할 날짜 선택", value=today.date()
-    )
+                cols[i].write("")
 
     st.write("---")
-    st.markdown(f"### 📋 {selected_date.strftime('%Y년 %m월 %d일')} 픽업 리스트")
+
+    # 선택된 날짜 입력창 (버튼 클릭 시 자동 연동)
+    selected_date = st.date_input(
+        "🔍 상세 픽업 내역을 확인할 날짜 선택",
+        value=st.session_state["selected_calendar_date"],
+        key="date_picker",
+    )
+    st.session_state["selected_calendar_date"] = selected_date
+
+    st.markdown(
+        f"### 📋 {selected_date.strftime('%Y년 %m월 %d일')} 픽업 리스트"
+    )
 
     if not df_month.empty and "날짜" in df_month.columns:
         df_selected = df_month[df_month["날짜"] == selected_date]
@@ -325,4 +318,4 @@ elif menu == "🔔 알림 발송 현황":
         )
         st.dataframe(df_1day, use_container_width=True)
     except Exception:
-        st.write("현재 발송 대상 알림이 없습니다.")
+        st.write("현재 발송 대상 알림이 없습니다.")ㄴ
