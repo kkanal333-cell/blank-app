@@ -1,5 +1,6 @@
 import calendar
 from datetime import datetime, timedelta
+import re
 import pandas as pd
 import sqlite3
 import streamlit as st
@@ -10,7 +11,22 @@ st.set_page_config(
 )
 
 
-# DB 연결 및 테이블/컬럼 자동 보정 함수
+# 전화번호 하이픈(-) 자동 변환 함수
+def format_phone(phone_str):
+    nums = re.sub(r"\D", "", phone_str)  # 숫자만 추출
+    if len(nums) == 11:
+        return f"{nums[:3]}-{nums[3:7]}-{nums[7:]}"
+    elif len(nums) == 10:
+        if nums.startswith("02"):
+            return f"{nums[:2]}-{nums[2:6]}-{nums[6:]}"
+        else:
+            return f"{nums[:3]}-{nums[3:6]}-{nums[6:]}"
+    elif len(nums) == 8:
+        return f"{nums[:4]}-{nums[4:]}"
+    return phone_str  # 그 외 형태는 그대로 반환
+
+
+# DB 연결 및 DB 호환성 자동 보정 함수
 def init_db():
     conn = sqlite3.connect("flower_shop.db", check_same_thread=False)
     c = conn.cursor()
@@ -31,6 +47,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER,
             product_name TEXT,
+            product TEXT,
             amount INTEGER DEFAULT 0,
             pickup_datetime TEXT NOT NULL,
             status TEXT DEFAULT '접수',
@@ -41,6 +58,7 @@ def init_db():
         )
     """)
 
+    # 기존 테이블 컬럼 점검 및 유연한 추가
     c.execute("PRAGMA table_info(orders)")
     columns = [col[1] for col in c.fetchall()]
 
@@ -48,6 +66,8 @@ def init_db():
         c.execute(
             "ALTER TABLE orders ADD COLUMN product_name TEXT DEFAULT ''"
         )
+    if "product" not in columns:
+        c.execute("ALTER TABLE orders ADD COLUMN product TEXT DEFAULT ''")
     if "amount" not in columns:
         c.execute("ALTER TABLE orders ADD COLUMN amount INTEGER DEFAULT 0")
 
@@ -76,12 +96,15 @@ menu = st.sidebar.radio(
 if menu == "📝 신규 주문 및 고객 등록":
     st.subheader("📝 신규 주문 및 고객 등록")
 
-    with st.form("order_form", clear_on_submit=True):
+    # 오류 시에도 입력 데이터를 유지하기 위해 clear_on_submit=False 로 설정
+    with st.form("order_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
 
         with col1:
             name = st.text_input("고객 이름 *")
-            phone = st.text_input("휴대폰 번호 (예: 010-1234-5678) *")
+            phone_input = st.text_input(
+                "휴대폰 번호 (하이픈 없이 입력 가능) *"
+            )
             anniversary = st.text_input("주요 기념일 (선택, 예: 05-08 어버이날)")
 
         with col2:
@@ -96,34 +119,56 @@ if menu == "📝 신규 주문 및 고객 등록":
         submitted = st.form_submit_button("주문 저장하기")
 
         if submitted:
-            if not name or not phone or not product_name:
+            if not name or not phone_input or not product_name:
                 st.error("이름, 휴대폰 번호, 상품명은 필수 입력 항목입니다.")
             else:
+                formatted_phone = format_phone(
+                    phone_input
+                )  # 전화번호 자동 변환
                 try:
                     c = conn.cursor()
-                    c.execute(
-                        "INSERT OR IGNORE INTO customers (name, phone, anniversary, notes) VALUES (?, ?, ?, ?)",
-                        (name, phone, anniversary, notes),
-                    )
-                    c.execute(
-                        "SELECT id FROM customers WHERE phone = ?", (phone,)
-                    )
-                    customer_id = c.fetchone()[0]
 
+                    # 1) 고객 정보 업데이트 또는 신규 등록
+                    c.execute(
+                        "SELECT id FROM customers WHERE phone = ?",
+                        (formatted_phone,),
+                    )
+                    row = c.fetchone()
+
+                    if row:
+                        customer_id = row[0]
+                        c.execute(
+                            "UPDATE customers SET name=?, anniversary=?, notes=? WHERE id=?",
+                            (name, anniversary, notes, customer_id),
+                        )
+                    else:
+                        c.execute(
+                            "INSERT INTO customers (name, phone, anniversary, notes) VALUES (?, ?, ?, ?)",
+                            (name, formatted_phone, anniversary, notes),
+                        )
+                        customer_id = c.lastrowid
+
+                    # 2) 주문 정보 등록 (product, product_name 컬럼 모두 지원)
                     pickup_datetime_str = f"{pickup_date} {pickup_time.strftime('%H:%M:%S')}"
                     c.execute(
-                        "INSERT INTO orders (customer_id, product_name, amount, pickup_datetime) VALUES (?, ?, ?, ?)",
+                        """
+                        INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime) 
+                        VALUES (?, ?, ?, ?, ?)
+                    """,
                         (
                             customer_id,
+                            product_name,
                             product_name,
                             amount,
                             pickup_datetime_str,
                         ),
                     )
+
                     conn.commit()
                     st.success(
-                        f"[{name}] 님의 주문이 성공적으로 등록되었습니다!"
+                        f"[{name}] ({formatted_phone}) 님의 주문이 성공적으로 저장되었습니다!"
                     )
+
                 except Exception as e:
                     st.error(f"저장 중 오류가 발생했습니다: {e}")
 
@@ -149,7 +194,8 @@ elif menu == "📅 픽업 일정 확인 (달력)":
     try:
         df_month = pd.read_sql_query(
             f"""
-            SELECT o.id, c.name as 고객명, c.phone as 연락처, o.product_name as 상품명, 
+            SELECT o.id, c.name as 고객명, c.phone as 연락처, 
+                   COALESCE(NULLIF(o.product_name, ''), o.product, '') as 상품명, 
                    o.amount as 금액, o.pickup_datetime, o.status as 상태
             FROM orders o JOIN customers c ON o.customer_id = c.id
             WHERE o.pickup_datetime BETWEEN '{start_date}' AND '{end_date}'
@@ -167,7 +213,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 모바일 지원 컴팩트 HTML 달력 생성
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
@@ -208,11 +253,9 @@ elif menu == "📅 픽업 일정 확인 (달력)":
 
     html_code += "</tbody></table>"
 
-    # 달력 표시
     st.markdown(html_code, unsafe_allow_html=True)
     st.write("")
 
-    # 상세 조회 날짜 선택
     selected_date = st.date_input(
         "🔍 상세 픽업 내역을 확인할 날짜 선택", value=today.date()
     )
