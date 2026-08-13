@@ -5,6 +5,7 @@ import re
 import pandas as pd
 import sqlite3
 import streamlit as st
+import streamlit.components.v1 as components
 
 # 페이지 기본 설정
 st.set_page_config(
@@ -89,8 +90,12 @@ conn = init_db()
 
 st.title("💐 Flower Shop CRM & 픽업 알림")
 
-# 사이드바 메뉴
+# 📌 사이드바 메뉴 및 모바일 자동 닫기 구현
 st.sidebar.markdown("### 📌 메뉴 목록")
+
+if "prev_menu" not in st.session_state:
+    st.session_state["prev_menu"] = "📝 신규 주문 및 고객 등록"
+
 menu = st.sidebar.radio(
     "메뉴 이동",
     [
@@ -101,6 +106,22 @@ menu = st.sidebar.radio(
     ],
     label_visibility="collapsed",
 )
+
+# 메뉴 변경 시 모바일 사이드바 자동 닫기
+if menu != st.session_state["prev_menu"]:
+    st.session_state["prev_menu"] = menu
+    components.html(
+        """
+        <script>
+            const closeBtn = window.parent.document.querySelector('button[data-testid="stSidebarCollapseButton"]');
+            if (closeBtn) {
+                closeBtn.click();
+            }
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
 
 # 1. 신규 주문 및 고객 등록
 if menu == "📝 신규 주문 및 고객 등록":
@@ -264,11 +285,10 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 📱🔥 모바일 가로 정렬 강제 세팅 (컬럼 줄바꿈 방지 핵심 CSS)
+    # 📱🔥 모바일 가로 정렬 강제 및 핑크색 뱃지 표현용 CSS
     st.markdown(
         """
         <style>
-        /* 모바일 화면에서 컬럼이 수직 스택되는 문제 강제 해결 */
         [data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
@@ -283,7 +303,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             margin: 0px !important;
         }
 
-        /* 달력 버튼 디자인 및 모바일 규격 고정 */
         [data-testid="stHorizontalBlock"] button {
             padding: 2px 0px !important;
             min-height: 36px !important;
@@ -294,7 +313,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             margin: 0px !important;
         }
 
-        /* 요일 헤더 커스텀 */
         .cal-header {
             text-align: center;
             font-weight: bold;
@@ -303,6 +321,12 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             background-color: #f0f2f6;
             border-radius: 4px;
             margin-bottom: 2px;
+        }
+
+        /* 핑크색 건수 강조 스타일 */
+        .pink-count {
+            color: #ff4b4b !important;
+            font-weight: bold;
         }
 
         div[data-testid="element-container"] {
@@ -332,8 +356,13 @@ elif menu == "📅 픽업 일정 확인 (달력)":
         for i, day in enumerate(week):
             if day.month == month:
                 count = counts_by_date.get(day, 0)
-                badge = f"({count})" if count > 0 else ""
-                label = f"{day.day}{badge}"
+
+                # 건수가 있을 경우 핑크색 숫자 뱃지 표시 (버튼 텍스트용 유니코드/이모지 조합 또는 구분)
+                if count > 0:
+                    badge = f"({count})"
+                    label = f"{day.day}\n{badge}"
+                else:
+                    label = f"{day.day}"
 
                 is_selected = day == st.session_state["selected_date"]
                 btn_type = "primary" if is_selected else "secondary"
