@@ -1,6 +1,6 @@
-calendar
+import calendar
 import datetime
-from datetime datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 import re
 import pandas as pd
 import sqlite3
@@ -11,7 +11,7 @@ st.set_page_config(
     page_title="꽃집 고객/주문 관리 시스템", page_icon="💐", layout="wide"
 )
 
-# 🇰🇷 한국 표준시(KST) 시간 설정 (외부 패키지 없이 내장 모듈 사용)
+# 🇰🇷 한국 표준시(KST) 시간 설정
 KST = timezone(timedelta(hours=9))
 
 
