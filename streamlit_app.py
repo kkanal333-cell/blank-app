@@ -285,7 +285,7 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 📱🔥 모바일 가로 정렬 강제 및 핑크색 뱃지 표현용 CSS
+    # 📱🔥 모바일 가로 정렬 & 핑크 버튼 스타일 정의
     st.markdown(
         """
         <style>
@@ -323,14 +323,22 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             margin-bottom: 2px;
         }
 
-        /* 핑크색 건수 강조 스타일 */
-        .pink-count {
-            color: #ff4b4b !important;
-            font-weight: bold;
-        }
-
         div[data-testid="element-container"] {
             margin-bottom: 0px !important;
+        }
+
+        /* 🩷 픽업 건수가 있는 날짜 버튼 핑크색 커스텀 스타일 */
+        div[data-testid="stButton"] > button[kind="secondaryFormSubmit"], 
+        .has-orders button {
+            background-color: #ff6b81 !important;
+            color: white !important;
+            border: 1px solid #ff4757 !important;
+            font-weight: bold !important;
+        }
+
+        .has-orders button:hover {
+            background-color: #ff4757 !important;
+            color: white !important;
         }
         </style>
     """,
@@ -356,22 +364,40 @@ elif menu == "📅 픽업 일정 확인 (달력)":
         for i, day in enumerate(week):
             if day.month == month:
                 count = counts_by_date.get(day, 0)
+                is_selected = day == st.session_state["selected_date"]
 
-                # 건수가 있을 경우 핑크색 숫자 뱃지 표시 (버튼 텍스트용 유니코드/이모지 조합 또는 구분)
                 if count > 0:
-                    badge = f"({count})"
-                    label = f"{day.day}\n{badge}"
+                    label = f"{day.day} ({count})"
                 else:
                     label = f"{day.day}"
 
-                is_selected = day == st.session_state["selected_date"]
+                # 버튼 기본 타입 설정
                 btn_type = "primary" if is_selected else "secondary"
 
-                if cols[i].button(
-                    label, key=f"d_{day}", type=btn_type, use_container_width=True
-                ):
-                    st.session_state["selected_date"] = day
-                    st.rerun()
+                # 건수가 있고 선택되지 않은 날짜인 경우 핑크색 컨테이너 div로 감싸기
+                if count > 0 and not is_selected:
+                    with cols[i]:
+                        st.markdown(
+                            "<div class='has-orders'>", unsafe_allow_html=True
+                        )
+                        if st.button(
+                            label,
+                            key=f"d_{day}",
+                            type=btn_type,
+                            use_container_width=True,
+                        ):
+                            st.session_state["selected_date"] = day
+                            st.rerun()
+                        st.markdown("</div>", unsafe_allow_html=True)
+                else:
+                    if cols[i].button(
+                        label,
+                        key=f"d_{day}",
+                        type=btn_type,
+                        use_container_width=True,
+                    ):
+                        st.session_state["selected_date"] = day
+                        st.rerun()
             else:
                 cols[i].write("")
 
