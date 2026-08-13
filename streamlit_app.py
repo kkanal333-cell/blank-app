@@ -10,12 +10,11 @@ st.set_page_config(
 )
 
 
-# DB 연결 및 데이터베이스 호환성 처리
+# DB 연결 및 테이블/컬럼 자동 보정 함수
 def init_db():
     conn = sqlite3.connect("flower_shop.db", check_same_thread=False)
     c = conn.cursor()
 
-    # 고객 테이블
     c.execute("""
         CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,13 +26,12 @@ def init_db():
         )
     """)
 
-    # 주문 테이블
     c.execute("""
         CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER,
-            product_name TEXT NOT NULL,
-            amount INTEGER NOT NULL,
+            product_name TEXT,
+            amount INTEGER DEFAULT 0,
             pickup_datetime TEXT NOT NULL,
             status TEXT DEFAULT '접수',
             notified_1day INTEGER DEFAULT 0,
@@ -42,6 +40,17 @@ def init_db():
             FOREIGN KEY (customer_id) REFERENCES customers (id)
         )
     """)
+
+    c.execute("PRAGMA table_info(orders)")
+    columns = [col[1] for col in c.fetchall()]
+
+    if "product_name" not in columns:
+        c.execute(
+            "ALTER TABLE orders ADD COLUMN product_name TEXT DEFAULT ''"
+        )
+    if "amount" not in columns:
+        c.execute("ALTER TABLE orders ADD COLUMN amount INTEGER DEFAULT 0")
+
     conn.commit()
     return conn
 
@@ -50,7 +59,7 @@ conn = init_db()
 
 st.title("💐 Flower Shop CRM & 픽업 알림")
 
-# 사이드바 메뉴 (기존처럼 메뉴가 한눈에 바로 보이는 radio 형태로 변경)
+# 사이드바 메뉴
 st.sidebar.markdown("### 📌 메뉴 목록")
 menu = st.sidebar.radio(
     "메뉴 이동",
@@ -90,29 +99,35 @@ if menu == "📝 신규 주문 및 고객 등록":
             if not name or not phone or not product_name:
                 st.error("이름, 휴대폰 번호, 상품명은 필수 입력 항목입니다.")
             else:
-                c = conn.cursor()
-                c.execute(
-                    "INSERT OR IGNORE INTO customers (name, phone, anniversary, notes) VALUES (?, ?, ?, ?)",
-                    (name, phone, anniversary, notes),
-                )
-                c.execute(
-                    "SELECT id FROM customers WHERE phone = ?", (phone,)
-                )
-                customer_id = c.fetchone()[0]
+                try:
+                    c = conn.cursor()
+                    c.execute(
+                        "INSERT OR IGNORE INTO customers (name, phone, anniversary, notes) VALUES (?, ?, ?, ?)",
+                        (name, phone, anniversary, notes),
+                    )
+                    c.execute(
+                        "SELECT id FROM customers WHERE phone = ?", (phone,)
+                    )
+                    customer_id = c.fetchone()[0]
 
-                pickup_datetime_str = (
-                    f"{pickup_date} {pickup_time.strftime('%H:%M:%S')}"
-                )
-                c.execute(
-                    "INSERT INTO orders (customer_id, product_name, amount, pickup_datetime) VALUES (?, ?, ?, ?)",
-                    (customer_id, product_name, amount, pickup_datetime_str),
-                )
-                conn.commit()
-                st.success(
-                    f"[{name}] 님의 주문이 성공적으로 등록되었습니다!"
-                )
+                    pickup_datetime_str = f"{pickup_date} {pickup_time.strftime('%H:%M:%S')}"
+                    c.execute(
+                        "INSERT INTO orders (customer_id, product_name, amount, pickup_datetime) VALUES (?, ?, ?, ?)",
+                        (
+                            customer_id,
+                            product_name,
+                            amount,
+                            pickup_datetime_str,
+                        ),
+                    )
+                    conn.commit()
+                    st.success(
+                        f"[{name}] 님의 주문이 성공적으로 등록되었습니다!"
+                    )
+                except Exception as e:
+                    st.error(f"저장 중 오류가 발생했습니다: {e}")
 
-# 2. 픽업 일정 확인 (달력 UI)
+# 2. 픽업 일정 확인 (모바일 반응형 달력 UI)
 elif menu == "📅 픽업 일정 확인 (달력)":
     st.subheader("📅 월간 픽업 달력")
 
@@ -131,11 +146,11 @@ elif menu == "📅 픽업 일정 확인 (달력)":
     last_day = calendar.monthrange(year, month)[1]
     end_date = f"{year}-{month:02d}-{last_day} 23:59:59"
 
-    # 에러 방지를 위한 안전한 DB 조회 처리
     try:
         df_month = pd.read_sql_query(
             f"""
-            SELECT o.*, c.name as 고객명, c.phone as 연락처
+            SELECT o.id, c.name as 고객명, c.phone as 연락처, o.product_name as 상품명, 
+                   o.amount as 금액, o.pickup_datetime, o.status as 상태
             FROM orders o JOIN customers c ON o.customer_id = c.id
             WHERE o.pickup_datetime BETWEEN '{start_date}' AND '{end_date}'
             ORDER BY o.pickup_datetime ASC
@@ -152,64 +167,74 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    st.write("---")
-
-    # 달력 표시
-    cal = calendar.Calendar(firstweekday=6)  # 일요일 시작
+    # 모바일 지원 컴팩트 HTML 달력 생성
+    cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
-    cols_header = st.columns(7)
-    days_name = ["일", "월", "화", "수", "목", "금", "토"]
-    for idx, day_name in enumerate(days_name):
-        cols_header[idx].markdown(
-            f"<h4 style='text-align: center;'>{day_name}</h4>",
-            unsafe_allow_html=True,
-        )
-
-    if "selected_date" not in st.session_state:
-        st.session_state["selected_date"] = today.date()
+    html_code = """
+    <style>
+        .calendar-table { width: 100%; border-collapse: collapse; text-align: center; font-family: sans-serif; }
+        .calendar-table th { background-color: #f0f2f6; padding: 8px 0; font-size: 14px; border: 1px solid #ddd; }
+        .calendar-table td { width: 14.28%; height: 50px; vertical-align: top; border: 1px solid #eee; padding: 2px; font-size: 13px; }
+        .day-num { font-weight: bold; color: #333; }
+        .badge { background-color: #ff4b4b; color: white; border-radius: 8px; padding: 1px 4px; font-size: 10px; display: inline-block; margin-top: 2px; }
+        .other-month { color: #ccc; background-color: #fafafa; }
+    </style>
+    <table class="calendar-table">
+        <thead>
+            <tr>
+                <th style="color:red;">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th style="color:blue;">토</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
 
     for week in month_days:
-        cols = st.columns(7)
-        for idx, day in enumerate(week):
+        html_code += "<tr>"
+        for day in week:
             if day.month == month:
                 count = counts_by_date.get(day, 0)
-                label = f"{day.day}일"
-                if count > 0:
-                    label += f" ({count}건)"
-
-                if cols[idx].button(
-                    label,
-                    key=str(day),
-                    type="primary" if count > 0 else "secondary",
-                    use_container_width=True,
-                ):
-                    st.session_state["selected_date"] = day
+                badge_html = (
+                    f'<br><span class="badge">{count}건</span>'
+                    if count > 0
+                    else ""
+                )
+                html_code += f'<td><span class="day-num">{day.day}</span>{badge_html}</td>'
             else:
-                cols[idx].write("")
+                html_code += (
+                    f'<td class="other-month">{day.day}</td>'
+                )
+        html_code += "</tr>"
+
+    html_code += "</tbody></table>"
+
+    # 달력 표시
+    st.markdown(html_code, unsafe_allow_html=True)
+    st.write("")
+
+    # 상세 조회 날짜 선택
+    selected_date = st.date_input(
+        "🔍 상세 픽업 내역을 확인할 날짜 선택", value=today.date()
+    )
 
     st.write("---")
-
-    # 선택 날짜 상세 리스트
-    selected_date = st.session_state["selected_date"]
     st.markdown(f"### 📋 {selected_date.strftime('%Y년 %m월 %d일')} 픽업 리스트")
 
     if not df_month.empty and "날짜" in df_month.columns:
         df_selected = df_month[df_month["날짜"] == selected_date]
         if not df_selected.empty:
-            # 표시 컬럼 정리
-            show_cols = []
-            for col in [
-                "pickup_datetime",
-                "고객명",
-                "연락처",
-                "product_name",
-                "amount",
-                "status",
-            ]:
-                if col in df_selected.columns:
-                    show_cols.append(col)
-
+            show_cols = [
+                col
+                for col in [
+                    "pickup_datetime",
+                    "고객명",
+                    "연락처",
+                    "상품명",
+                    "금액",
+                    "상태",
+                ]
+                if col in df_selected.columns
+            ]
             st.dataframe(df_selected[show_cols], use_container_width=True)
         else:
             st.info("해당 날짜에 예정된 픽업 건이 없습니다.")
