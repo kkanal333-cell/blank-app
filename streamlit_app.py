@@ -19,7 +19,6 @@ def get_kst_today():
     return datetime.now(KST).date()
 
 
-# 한국 기준 오늘 날짜
 today = get_kst_today()
 
 
@@ -225,7 +224,7 @@ elif menu == "📅 픽업 일정 확인 (달력)":
 
     with col_title:
         st.markdown(
-            f"<h4 style='text-align: center; margin: 0; padding-top: 4px; font-size: 16px;'>🗓️ {year}년 {month}월 (오늘: {today.strftime('%m/%d')})</h4>",
+            f"<h4 style='text-align: center; margin: 0; padding-top: 4px; font-size: 15px;'>🗓️ {year}년 {month}월 (오늘: {today.strftime('%m/%d')})</h4>",
             unsafe_allow_html=True,
         )
 
@@ -265,32 +264,47 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 📱 모바일 최적화 CSS 스타일 (버튼 높이 38px 고정)
+    # 📱🔥 모바일 가로 정렬 강제 세팅 (컬럼 줄바꿈 방지 핵심 CSS)
     st.markdown(
         """
         <style>
-        div[data-testid="stColumn"] {
-            padding: 1px !important;
+        /* 모바일 화면에서 컬럼이 수직 스택되는 문제 강제 해결 */
+        [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            gap: 2px !important;
+        }
+        
+        [data-testid="stHorizontalBlock"] > div {
+            min-width: 0 !important;
+            flex: 1 1 0% !important;
+            padding: 0px !important;
             margin: 0px !important;
         }
-        div[data-testid="stColumn"] button {
+
+        /* 달력 버튼 디자인 및 모바일 규격 고정 */
+        [data-testid="stHorizontalBlock"] button {
             padding: 2px 0px !important;
-            min-height: 38px !important;
-            height: 38px !important;
-            font-size: 13px !important;
+            min-height: 36px !important;
+            height: 36px !important;
+            font-size: 11px !important;
             line-height: 1.1 !important;
-            border-radius: 6px !important;
-            margin: 1px 0px !important;
+            border-radius: 4px !important;
+            margin: 0px !important;
         }
+
+        /* 요일 헤더 커스텀 */
         .cal-header {
             text-align: center;
             font-weight: bold;
             font-size: 12px;
-            padding: 4px 0;
+            padding: 3px 0;
             background-color: #f0f2f6;
             border-radius: 4px;
             margin-bottom: 2px;
         }
+
         div[data-testid="element-container"] {
             margin-bottom: 0px !important;
         }
@@ -318,7 +332,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
         for i, day in enumerate(week):
             if day.month == month:
                 count = counts_by_date.get(day, 0)
-                # 모바일 화면을 고려해 건수 표기를 컴팩트하게
                 badge = f"({count})" if count > 0 else ""
                 label = f"{day.day}{badge}"
 
