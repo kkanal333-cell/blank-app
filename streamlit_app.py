@@ -107,7 +107,6 @@ menu = st.sidebar.radio(
     label_visibility="collapsed",
 )
 
-# 메뉴 변경 시 모바일 사이드바 자동 닫기
 if menu != st.session_state["prev_menu"]:
     st.session_state["prev_menu"] = menu
     components.html(
@@ -201,7 +200,6 @@ if menu == "📝 신규 주문 및 고객 등록":
 elif menu == "📅 픽업 일정 확인 (달력)":
     st.subheader("📅 픽업 일정 확인")
 
-    # 선택된 날짜 세션 상태
     if "selected_date" not in st.session_state:
         st.session_state["selected_date"] = today
 
@@ -232,7 +230,7 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             st.session_state["selected_date"] = today
             st.rerun()
 
-    # 월 이동 컨트롤 (이전달 / 제목 / 다음달)
+    # 월 이동 컨트롤
     col_prev, col_title, col_next = st.columns([1.2, 3, 1.2])
 
     with col_prev:
@@ -285,7 +283,7 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 📱🔥 모바일 가로 정렬 & 핑크 버튼 스타일 정의
+    # 📱🔥 모바일 가로 정렬 및 강력한 커스텀 버튼 CSS
     st.markdown(
         """
         <style>
@@ -305,39 +303,50 @@ elif menu == "📅 픽업 일정 확인 (달력)":
 
         [data-testid="stHorizontalBlock"] button {
             padding: 2px 0px !important;
-            min-height: 36px !important;
-            height: 36px !important;
+            min-height: 38px !important;
+            height: 38px !important;
             font-size: 11px !important;
             line-height: 1.1 !important;
             border-radius: 4px !important;
             margin: 0px !important;
+            width: 100% !important;
         }
 
         .cal-header {
             text-align: center;
             font-weight: bold;
             font-size: 12px;
-            padding: 3px 0;
+            padding: 4px 0;
             background-color: #f0f2f6;
             border-radius: 4px;
-            margin-bottom: 2px;
+            margin-bottom: 3px;
         }
 
         div[data-testid="element-container"] {
             margin-bottom: 0px !important;
         }
 
-        /* 🩷 픽업 건수가 있는 날짜 버튼 핑크색 커스텀 스타일 */
-        div[data-testid="stButton"] > button[kind="secondaryFormSubmit"], 
-        .has-orders button {
+        /* 🩷 픽업 건수가 있는 날짜 (강제 핑크 스타일 적용) */
+        div.has-pickup button {
             background-color: #ff6b81 !important;
             color: white !important;
             border: 1px solid #ff4757 !important;
             font-weight: bold !important;
         }
-
-        .has-orders button:hover {
+        div.has-pickup button:hover {
             background-color: #ff4757 !important;
+            color: white !important;
+        }
+
+        /* 🟦 선택된 날짜 (강제 파란색 스타일 적용) */
+        div.is-selected button {
+            background-color: #1f77b4 !important;
+            color: white !important;
+            border: 1px solid #0056b3 !important;
+            font-weight: bold !important;
+        }
+        div.is-selected button:hover {
+            background-color: #0056b3 !important;
             color: white !important;
         }
         </style>
@@ -371,33 +380,26 @@ elif menu == "📅 픽업 일정 확인 (달력)":
                 else:
                     label = f"{day.day}"
 
-                # 버튼 기본 타입 설정
-                btn_type = "primary" if is_selected else "secondary"
+                # 클래스 선택 (선택된 날짜 / 픽업 있는 날짜 / 일반)
+                css_class = ""
+                if is_selected:
+                    css_class = "is-selected"
+                elif count > 0:
+                    css_class = "has-pickup"
 
-                # 건수가 있고 선택되지 않은 날짜인 경우 핑크색 컨테이너 div로 감싸기
-                if count > 0 and not is_selected:
-                    with cols[i]:
+                with cols[i]:
+                    if css_class:
                         st.markdown(
-                            "<div class='has-orders'>", unsafe_allow_html=True
+                            f"<div class='{css_class}'>",
+                            unsafe_allow_html=True,
                         )
-                        if st.button(
-                            label,
-                            key=f"d_{day}",
-                            type=btn_type,
-                            use_container_width=True,
-                        ):
-                            st.session_state["selected_date"] = day
-                            st.rerun()
-                        st.markdown("</div>", unsafe_allow_html=True)
-                else:
-                    if cols[i].button(
-                        label,
-                        key=f"d_{day}",
-                        type=btn_type,
-                        use_container_width=True,
-                    ):
+
+                    if st.button(label, key=f"d_{day}", use_container_width=True):
                         st.session_state["selected_date"] = day
                         st.rerun()
+
+                    if css_class:
+                        st.markdown("</div>", unsafe_allow_html=True)
             else:
                 cols[i].write("")
 
