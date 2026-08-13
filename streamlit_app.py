@@ -177,7 +177,7 @@ if menu == "📝 신규 주문 및 고객 등록":
                 except Exception as e:
                     st.error(f"저장 중 오류가 발생했습니다: {e}")
 
-# 2. 픽업 일정 확인
+# 2. 픽업 일정 확인 (달력)
 elif menu == "📅 픽업 일정 확인 (달력)":
     st.subheader("📅 픽업 일정 확인")
 
@@ -185,11 +185,10 @@ elif menu == "📅 픽업 일정 확인 (달력)":
     if "selected_date" not in st.session_state:
         st.session_state["selected_date"] = today
 
-    # 현재 선택된 년/월 정보
     current_selected = st.session_state["selected_date"]
     year, month = current_selected.year, current_selected.month
 
-    # 상단 날짜 선택 컨트롤 & 오늘 버튼
+    # 상단 날짜 선택 및 오늘 버튼
     col_date, col_today = st.columns([3, 1])
 
     with col_date:
@@ -213,12 +212,11 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             st.session_state["selected_date"] = today
             st.rerun()
 
-    # 월 변경 컨트롤 (이전달 / 제목 / 다음달)
-    col_prev, col_title, col_next = st.columns([1, 3, 1])
+    # 월 이동 컨트롤 (이전달 / 제목 / 다음달)
+    col_prev, col_title, col_next = st.columns([1.2, 3, 1.2])
 
     with col_prev:
         if st.button("◀ 이전달", use_container_width=True):
-            # 1월에서 이전달로 가면 이전 해 12월로
             first_day_curr = datetime(
                 year, month, 1, tzinfo=KST
             ) - timedelta(days=1)
@@ -227,13 +225,12 @@ elif menu == "📅 픽업 일정 확인 (달력)":
 
     with col_title:
         st.markdown(
-            f"<h4 style='text-align: center; margin: 0;'>🗓️ {year}년 {month}월 (오늘: {today.strftime('%m월 %d일')})</h4>",
+            f"<h4 style='text-align: center; margin: 0; padding-top: 4px; font-size: 16px;'>🗓️ {year}년 {month}월 (오늘: {today.strftime('%m/%d')})</h4>",
             unsafe_allow_html=True,
         )
 
     with col_next:
         if st.button("다음달 ▶", use_container_width=True):
-            # 다음달 1일로 변경
             last_day_curr = calendar.monthrange(year, month)[1]
             next_month_day = datetime(
                 year, month, last_day_curr, tzinfo=KST
@@ -241,7 +238,7 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             st.session_state["selected_date"] = next_month_day.date()
             st.rerun()
 
-    # 해당 월의 전체 주문 데이터 가져오기
+    # 월 주문 데이터 로드
     start_date = f"{year}-{month:02d}-01"
     last_day = calendar.monthrange(year, month)[1]
     end_date = f"{year}-{month:02d}-{last_day} 23:59:59"
@@ -268,14 +265,35 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 인터랙티브 달력 버튼 스타일 적용
+    # 📱 모바일 최적화 CSS 스타일 (버튼 높이 38px 고정)
     st.markdown(
         """
         <style>
-        div[data-testid="stColumn"] { padding: 1px !important; }
-        .cal-btn-selected button { background-color: #ff4b4b !important; color: white !important; font-weight: bold !important; border: 2px solid #b30000 !important; }
-        .cal-btn-today button { background-color: #ffeeb3 !important; font-weight: bold !important; }
-        .cal-header { text-align: center; font-weight: bold; padding: 4px 0; background-color: #f0f2f6; border-radius: 4px; margin-bottom: 4px; }
+        div[data-testid="stColumn"] {
+            padding: 1px !important;
+            margin: 0px !important;
+        }
+        div[data-testid="stColumn"] button {
+            padding: 2px 0px !important;
+            min-height: 38px !important;
+            height: 38px !important;
+            font-size: 13px !important;
+            line-height: 1.1 !important;
+            border-radius: 6px !important;
+            margin: 1px 0px !important;
+        }
+        .cal-header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 4px 0;
+            background-color: #f0f2f6;
+            border-radius: 4px;
+            margin-bottom: 2px;
+        }
+        div[data-testid="element-container"] {
+            margin-bottom: 0px !important;
+        }
         </style>
     """,
         unsafe_allow_html=True,
@@ -285,13 +303,13 @@ elif menu == "📅 픽업 일정 확인 (달력)":
     days_name = ["일", "월", "화", "수", "목", "금", "토"]
     cols_h = st.columns(7)
     for i, h in enumerate(days_name):
-        color = "red" if i == 0 else ("blue" if i == 6 else "black")
+        color = "red" if i == 0 else ("blue" if i == 6 else "#333333")
         cols_h[i].markdown(
             f"<div class='cal-header' style='color:{color};'>{h}</div>",
             unsafe_allow_html=True,
         )
 
-    # 달력 생성 (인터랙티브 클릭 가능 버튼)
+    # 달력 그리드 생성
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
@@ -300,15 +318,13 @@ elif menu == "📅 픽업 일정 확인 (달력)":
         for i, day in enumerate(week):
             if day.month == month:
                 count = counts_by_date.get(day, 0)
-                badge = f" [{count}건]" if count > 0 else ""
+                # 모바일 화면을 고려해 건수 표기를 컴팩트하게
+                badge = f"({count})" if count > 0 else ""
                 label = f"{day.day}{badge}"
 
-                # 선택 날짜 및 오늘 날짜 스타일 구분
                 is_selected = day == st.session_state["selected_date"]
-                is_today = day == today
-
-                # 버튼 클릭 시 선택 날짜 업데이트 후 리런
                 btn_type = "primary" if is_selected else "secondary"
+
                 if cols[i].button(
                     label, key=f"d_{day}", type=btn_type, use_container_width=True
                 ):
