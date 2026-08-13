@@ -283,7 +283,7 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 📱🔥 모바일 가로 정렬 및 강력한 커스텀 버튼 CSS
+    # 기본 그리드 CSS
     st.markdown(
         """
         <style>
@@ -325,30 +325,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
         div[data-testid="element-container"] {
             margin-bottom: 0px !important;
         }
-
-        /* 🩷 픽업 건수가 있는 날짜 (강제 핑크 스타일 적용) */
-        div.has-pickup button {
-            background-color: #ff6b81 !important;
-            color: white !important;
-            border: 1px solid #ff4757 !important;
-            font-weight: bold !important;
-        }
-        div.has-pickup button:hover {
-            background-color: #ff4757 !important;
-            color: white !important;
-        }
-
-        /* 🟦 선택된 날짜 (강제 파란색 스타일 적용) */
-        div.is-selected button {
-            background-color: #1f77b4 !important;
-            color: white !important;
-            border: 1px solid #0056b3 !important;
-            font-weight: bold !important;
-        }
-        div.is-selected button:hover {
-            background-color: #0056b3 !important;
-            color: white !important;
-        }
         </style>
     """,
         unsafe_allow_html=True,
@@ -368,40 +344,60 @@ elif menu == "📅 픽업 일정 확인 (달력)":
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
+    # 동적 색상 스타일 지정을 위한 리스트
+    pickup_button_keys = []
+    selected_button_key = f"d_{st.session_state['selected_date']}"
+
     for week in month_days:
         cols = st.columns(7)
         for i, day in enumerate(week):
             if day.month == month:
                 count = counts_by_date.get(day, 0)
-                is_selected = day == st.session_state["selected_date"]
+                btn_key = f"d_{day}"
 
                 if count > 0:
                     label = f"{day.day} ({count})"
+                    pickup_button_keys.append(btn_key)
                 else:
                     label = f"{day.day}"
 
-                # 클래스 선택 (선택된 날짜 / 픽업 있는 날짜 / 일반)
-                css_class = ""
-                if is_selected:
-                    css_class = "is-selected"
-                elif count > 0:
-                    css_class = "has-pickup"
-
                 with cols[i]:
-                    if css_class:
-                        st.markdown(
-                            f"<div class='{css_class}'>",
-                            unsafe_allow_html=True,
-                        )
-
-                    if st.button(label, key=f"d_{day}", use_container_width=True):
+                    if st.button(label, key=btn_key, use_container_width=True):
                         st.session_state["selected_date"] = day
                         st.rerun()
-
-                    if css_class:
-                        st.markdown("</div>", unsafe_allow_html=True)
             else:
                 cols[i].write("")
+
+    # 🎨 key를 직접 지정하여 픽업 날짜(핑크색) 및 선택 날짜(파란색) 색상 강제 주입
+    dynamic_css = "<style>\n"
+
+    # 1. 픽업 건수가 있는 날짜 -> 🩷 핑크색
+    for p_key in pickup_button_keys:
+        dynamic_css += f"""
+        div[data-testid="stButton"] > button[key="{p_key}"],
+        button[aria-label*="{p_key}"],
+        div.st-key-{p_key} button {{
+            background-color: #ff6b81 !important;
+            color: white !important;
+            border: 1px solid #ff4757 !important;
+            font-weight: bold !important;
+        }}
+        """
+
+    # 2. 현재 선택된 날짜 -> 🟦 파란색 (선택된 날짜가 픽업 날짜이더라도 파란색으로 우선 강조)
+    dynamic_css += f"""
+    div[data-testid="stButton"] > button[key="{selected_button_key}"],
+    button[aria-label*="{selected_button_key}"],
+    div.st-key-{selected_button_key} button {{
+        background-color: #1f77b4 !important;
+        color: white !important;
+        border: 1px solid #0056b3 !important;
+        font-weight: bold !important;
+    }}
+    </style>
+    """
+
+    st.markdown(dynamic_css, unsafe_allow_html=True)
 
     # 📋 선택된 날짜 상세 내역 리스트
     st.write("---")
