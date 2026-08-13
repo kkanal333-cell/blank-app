@@ -13,7 +13,7 @@ st.set_page_config(
 
 # 전화번호 하이픈(-) 자동 변환 함수
 def format_phone(phone_str):
-    nums = re.sub(r"\D", "", phone_str)  # 숫자만 추출
+    nums = re.sub(r"\D", "", phone_str)
     if len(nums) == 11:
         return f"{nums[:3]}-{nums[3:7]}-{nums[7:]}"
     elif len(nums) == 10:
@@ -26,7 +26,7 @@ def format_phone(phone_str):
     return phone_str
 
 
-# DB 연결 및 DB 호환성 자동 보정 함수
+# DB 연결 및 테이블 보정
 def init_db():
     conn = sqlite3.connect("flower_shop.db", check_same_thread=False)
     c = conn.cursor()
@@ -76,6 +76,9 @@ def init_db():
 
 conn = init_db()
 
+# 실시간 오늘 날짜 구하기
+today = datetime.now().date()
+
 st.title("💐 Flower Shop CRM & 픽업 알림")
 
 # 사이드바 메뉴
@@ -90,9 +93,6 @@ menu = st.sidebar.radio(
     ],
     label_visibility="collapsed",
 )
-
-# 접속 기준 실시간 오늘 날짜
-today = datetime.now().date()
 
 # 1. 신규 주문 및 고객 등록
 if menu == "📝 신규 주문 및 고객 등록":
@@ -113,6 +113,7 @@ if menu == "📝 신규 주문 및 고객 등록":
                 "주문 상품명 (예: 생일 축하 꽃다발) *"
             )
             amount = st.number_input("결제 금액 (원)", step=10000, value=50000)
+            # 기본 픽업 날짜를 접속 당일로 설정
             pickup_date = st.date_input("픽업 날짜 *", value=today)
             pickup_time = st.time_input("픽업 시간 *")
 
@@ -126,7 +127,6 @@ if menu == "📝 신규 주문 및 고객 등록":
                 formatted_phone = format_phone(phone_input)
                 try:
                     c = conn.cursor()
-
                     c.execute(
                         "SELECT id FROM customers WHERE phone = ?",
                         (formatted_phone,),
@@ -169,12 +169,13 @@ if menu == "📝 신규 주문 및 고객 등록":
                 except Exception as e:
                     st.error(f"저장 중 오류가 발생했습니다: {e}")
 
-# 2. 픽업 일정 확인 (클릭 가능한 달력)
+# 2. 픽업 일정 확인 (달력)
 elif menu == "📅 픽업 일정 확인 (달력)":
     st.subheader("📅 월간 픽업 달력")
 
-    if "selected_calendar_date" not in st.session_state:
-        st.session_state["selected_calendar_date"] = today
+    # 선택 날짜 상태 초기화 (접속 시 무조건 오늘)
+    if "selected_date" not in st.session_state:
+        st.session_state["selected_date"] = today
 
     col_y, col_m = st.columns(2)
     with col_y:
@@ -212,14 +213,35 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
+    # 커스텀 CSS 적용 (버튼 정렬 및 텍스트 축소)
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stColumn"] {
+            padding: 2px !important;
+        }
+        div.stButton > button {
+            width: 100%;
+            padding: 4px 2px !important;
+            font-size: 12px !important;
+            min-height: 48px !important;
+        }
+        </style>
+    """,
+        unsafe_allow_html=True,
+    )
+
+    # 요일 헤더
     cols_header = st.columns(7)
     days_name = ["일", "월", "화", "수", "목", "금", "토"]
     for i, h in enumerate(days_name):
+        color = "red" if i == 0 else ("blue" if i == 6 else "inherit")
         cols_header[i].markdown(
-            f"<div style='text-align: center; font-weight: bold;'>{h}</div>",
+            f"<div style='text-align: center; font-weight: bold; color:{color};'>{h}</div>",
             unsafe_allow_html=True,
         )
 
+    # 달력 생성
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
@@ -228,30 +250,40 @@ elif menu == "📅 픽업 일정 확인 (달력)":
         for i, day in enumerate(week):
             if day.month == month:
                 count = counts_by_date.get(day, 0)
-                label = f"{day.day}일"
+                # 오늘 날짜 표시
+                is_today = " (오늘)" if day == today else ""
+                label = f"{day.day}일{is_today}"
                 if count > 0:
-                    label += f"\n({count}건)"
+                    label += f"\n[{count}건]"
 
-                if cols[i].button(label, key=f"btn_{day}"):
-                    st.session_state["selected_calendar_date"] = day
+                # 날짜 버튼 클릭 시
+                if cols[i].button(label, key=f"cal_btn_{day}"):
+                    st.session_state["selected_date"] = day
+                    st.rerun()
             else:
                 cols[i].write("")
 
     st.write("---")
 
+    # 선택 날짜 표시 및 입력 피커
+    def on_date_change():
+        st.session_state["selected_date"] = st.session_state["picker_key"]
+
     selected_date = st.date_input(
         "🔍 상세 픽업 내역을 확인할 날짜 선택",
-        value=st.session_state["selected_calendar_date"],
-        key="date_picker",
+        value=st.session_state["selected_date"],
+        key="picker_key",
+        on_change=on_date_change,
     )
-    st.session_state["selected_calendar_date"] = selected_date
 
     st.markdown(
-        f"### 📋 {selected_date.strftime('%Y년 %m월 %d일')} 픽업 리스트"
+        f"### 📋 {st.session_state['selected_date'].strftime('%Y년 %m월 %d일')} 픽업 리스트"
     )
 
     if not df_month.empty and "날짜" in df_month.columns:
-        df_selected = df_month[df_month["날짜"] == selected_date]
+        df_selected = df_month[
+            df_month["날짜"] == st.session_state["selected_date"]
+        ]
         if not df_selected.empty:
             show_cols = [
                 col
