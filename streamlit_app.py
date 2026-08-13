@@ -1,8 +1,8 @@
-import calendar
-from datetime import datetime, timedelta
+calendar
+import datetime
+from datetime datetime, timedelta, timezone
 import re
 import pandas as pd
-import pytz
 import sqlite3
 import streamlit as st
 
@@ -11,8 +11,8 @@ st.set_page_config(
     page_title="꽃집 고객/주문 관리 시스템", page_icon="💐", layout="wide"
 )
 
-# 🇰🇷 한국 표준시(KST) 시간 설정
-KST = pytz.timezone("Asia/Seoul")
+# 🇰🇷 한국 표준시(KST) 시간 설정 (외부 패키지 없이 내장 모듈 사용)
+KST = timezone(timedelta(hours=9))
 
 
 def get_kst_today():
@@ -122,7 +122,6 @@ if menu == "📝 신규 주문 및 고객 등록":
                 "주문 상품명 (예: 생일 축하 꽃다발) *"
             )
             amount = st.number_input("결제 금액 (원)", step=10000, value=50000)
-            # 한국 기준 오늘 날짜 자동 적용
             pickup_date = st.date_input("픽업 날짜 *", value=today)
             pickup_time = st.time_input("픽업 시간 *")
 
@@ -178,15 +177,13 @@ if menu == "📝 신규 주문 및 고객 등록":
                 except Exception as e:
                     st.error(f"저장 중 오류가 발생했습니다: {e}")
 
-# 2. 픽업 일정 확인 (모바일 완전 최적화 UI)
+# 2. 픽업 일정 확인
 elif menu == "📅 픽업 일정 확인 (달력)":
     st.subheader("📅 픽업 일정 확인")
 
-    # 선택한 날짜 세션 초기화
     if "selected_date" not in st.session_state:
         st.session_state["selected_date"] = today
 
-    # 상단 날짜 이동 및 선택 컨트롤
     col_date, col_today_btn = st.columns([3, 1])
 
     with col_date:
@@ -198,13 +195,12 @@ elif menu == "📅 픽업 일정 확인 (달력)":
         st.session_state["selected_date"] = selected_date
 
     with col_today_btn:
-        st.write("")  # 여백 맞춤
+        st.write("")
         st.write("")
         if st.button("오늘 날짜로 이동", use_container_width=True):
             st.session_state["selected_date"] = today
             st.rerun()
 
-    # 해당 월의 전체 주문 데이터 가져오기
     year, month = selected_date.year, selected_date.month
     start_date = f"{year}-{month:02d}-01"
     last_day = calendar.monthrange(year, month)[1]
@@ -232,7 +228,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 📌 깔끔한 월간 현황 요약 요약표 (깨짐 없는 HTML 표)
     st.markdown(
         f"#### 🗓️ {year}년 {month}월 픽업 현황 요약 (오늘: {today.strftime('%m월 %d일')})"
     )
@@ -285,7 +280,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
     st.markdown(html_code, unsafe_allow_html=True)
     st.write("")
 
-    # 📋 선택된 날짜 상세 내역 리스트
     st.write("---")
     st.markdown(
         f"### 📋 {selected_date.strftime('%Y년 %m월 %d일')} 픽업 상세 리스트"
