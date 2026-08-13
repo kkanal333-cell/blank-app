@@ -181,27 +181,67 @@ if menu == "📝 신규 주문 및 고객 등록":
 elif menu == "📅 픽업 일정 확인 (달력)":
     st.subheader("📅 픽업 일정 확인")
 
+    # 선택된 날짜 세션 상태
     if "selected_date" not in st.session_state:
         st.session_state["selected_date"] = today
 
-    col_date, col_today_btn = st.columns([3, 1])
+    # 현재 선택된 년/월 정보
+    current_selected = st.session_state["selected_date"]
+    year, month = current_selected.year, current_selected.month
+
+    # 상단 날짜 선택 컨트롤 & 오늘 버튼
+    col_date, col_today = st.columns([3, 1])
 
     with col_date:
-        selected_date = st.date_input(
+
+        def on_picker_change():
+            st.session_state["selected_date"] = st.session_state[
+                "temp_date_picker"
+            ]
+
+        st.date_input(
             "📅 확인하고 싶은 날짜를 선택하세요",
             value=st.session_state["selected_date"],
-            key="pickup_date_picker",
+            key="temp_date_picker",
+            on_change=on_picker_change,
         )
-        st.session_state["selected_date"] = selected_date
 
-    with col_today_btn:
+    with col_today:
         st.write("")
         st.write("")
         if st.button("오늘 날짜로 이동", use_container_width=True):
             st.session_state["selected_date"] = today
             st.rerun()
 
-    year, month = selected_date.year, selected_date.month
+    # 월 변경 컨트롤 (이전달 / 제목 / 다음달)
+    col_prev, col_title, col_next = st.columns([1, 3, 1])
+
+    with col_prev:
+        if st.button("◀ 이전달", use_container_width=True):
+            # 1월에서 이전달로 가면 이전 해 12월로
+            first_day_curr = datetime(
+                year, month, 1, tzinfo=KST
+            ) - timedelta(days=1)
+            st.session_state["selected_date"] = first_day_curr.date()
+            st.rerun()
+
+    with col_title:
+        st.markdown(
+            f"<h4 style='text-align: center; margin: 0;'>🗓️ {year}년 {month}월 (오늘: {today.strftime('%m월 %d일')})</h4>",
+            unsafe_allow_html=True,
+        )
+
+    with col_next:
+        if st.button("다음달 ▶", use_container_width=True):
+            # 다음달 1일로 변경
+            last_day_curr = calendar.monthrange(year, month)[1]
+            next_month_day = datetime(
+                year, month, last_day_curr, tzinfo=KST
+            ) + timedelta(days=1)
+            st.session_state["selected_date"] = next_month_day.date()
+            st.rerun()
+
+    # 해당 월의 전체 주문 데이터 가져오기
     start_date = f"{year}-{month:02d}-01"
     last_day = calendar.monthrange(year, month)[1]
     end_date = f"{year}-{month:02d}-{last_day} 23:59:59"
@@ -228,65 +268,65 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
+    # 인터랙티브 달력 버튼 스타일 적용
     st.markdown(
-        f"#### 🗓️ {year}년 {month}월 픽업 현황 요약 (오늘: {today.strftime('%m월 %d일')})"
+        """
+        <style>
+        div[data-testid="stColumn"] { padding: 1px !important; }
+        .cal-btn-selected button { background-color: #ff4b4b !important; color: white !important; font-weight: bold !important; border: 2px solid #b30000 !important; }
+        .cal-btn-today button { background-color: #ffeeb3 !important; font-weight: bold !important; }
+        .cal-header { text-align: center; font-weight: bold; padding: 4px 0; background-color: #f0f2f6; border-radius: 4px; margin-bottom: 4px; }
+        </style>
+    """,
+        unsafe_allow_html=True,
     )
 
+    # 요일 헤더
+    days_name = ["일", "월", "화", "수", "목", "금", "토"]
+    cols_h = st.columns(7)
+    for i, h in enumerate(days_name):
+        color = "red" if i == 0 else ("blue" if i == 6 else "black")
+        cols_h[i].markdown(
+            f"<div class='cal-header' style='color:{color};'>{h}</div>",
+            unsafe_allow_html=True,
+        )
+
+    # 달력 생성 (인터랙티브 클릭 가능 버튼)
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
-    html_code = """
-    <style>
-        .cal-table { width: 100%; border-collapse: collapse; text-align: center; }
-        .cal-table th { background-color: #f0f2f6; padding: 6px; font-size: 13px; border: 1px solid #ddd; }
-        .cal-table td { width: 14.28%; height: 42px; vertical-align: top; border: 1px solid #eee; padding: 2px; font-size: 12px; }
-        .is-today { background-color: #ffeeb3 !important; font-weight: bold; }
-        .is-selected { border: 2px solid #ff4b4b !important; font-weight: bold; }
-        .badge { background-color: #ff4b4b; color: white; border-radius: 6px; padding: 1px 3px; font-size: 10px; }
-        .other-m { color: #ccc; }
-    </style>
-    <table class="cal-table">
-        <thead><tr>
-            <th style="color:red;">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th style="color:blue;">토</th>
-        </tr></thead><tbody>
-    """
-
     for week in month_days:
-        html_code += "<tr>"
-        for day in week:
+        cols = st.columns(7)
+        for i, day in enumerate(week):
             if day.month == month:
                 count = counts_by_date.get(day, 0)
-                badge = (
-                    f'<br><span class="badge">{count}건</span>'
-                    if count > 0
-                    else ""
-                )
+                badge = f" [{count}건]" if count > 0 else ""
+                label = f"{day.day}{badge}"
 
-                classes = []
-                if day == today:
-                    classes.append("is-today")
-                if day == selected_date:
-                    classes.append("is-selected")
+                # 선택 날짜 및 오늘 날짜 스타일 구분
+                is_selected = day == st.session_state["selected_date"]
+                is_today = day == today
 
-                class_attr = (
-                    f'class="{" ".join(classes)}"' if classes else ""
-                )
-                html_code += f"<td {class_attr}>{day.day}{badge}</td>"
+                # 버튼 클릭 시 선택 날짜 업데이트 후 리런
+                btn_type = "primary" if is_selected else "secondary"
+                if cols[i].button(
+                    label, key=f"d_{day}", type=btn_type, use_container_width=True
+                ):
+                    st.session_state["selected_date"] = day
+                    st.rerun()
             else:
-                html_code += f'<td class="other-m">{day.day}</td>'
-        html_code += "</tr>"
-    html_code += "</tbody></table>"
+                cols[i].write("")
 
-    st.markdown(html_code, unsafe_allow_html=True)
-    st.write("")
-
+    # 📋 선택된 날짜 상세 내역 리스트
     st.write("---")
     st.markdown(
-        f"### 📋 {selected_date.strftime('%Y년 %m월 %d일')} 픽업 상세 리스트"
+        f"### 📋 {st.session_state['selected_date'].strftime('%Y년 %m월 %d일')} 픽업 상세 리스트"
     )
 
     if not df_month.empty and "날짜" in df_month.columns:
-        df_selected = df_month[df_month["날짜"] == selected_date]
+        df_selected = df_month[
+            df_month["날짜"] == st.session_state["selected_date"]
+        ]
         if not df_selected.empty:
             show_cols = [
                 col
@@ -303,7 +343,7 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             st.dataframe(df_selected[show_cols], use_container_width=True)
         else:
             st.info(
-                f"{selected_date.strftime('%m월 %d일')}에 예정된 픽업 건이 없습니다."
+                f"{st.session_state['selected_date'].strftime('%m월 %d일')}에 예정된 픽업 건이 없습니다."
             )
     else:
         st.info("예정된 픽업 건이 없습니다.")
