@@ -2,6 +2,7 @@ import calendar
 from datetime import datetime, timedelta
 import re
 import pandas as pd
+import pytz
 import sqlite3
 import streamlit as st
 
@@ -9,6 +10,17 @@ import streamlit as st
 st.set_page_config(
     page_title="꽃집 고객/주문 관리 시스템", page_icon="💐", layout="wide"
 )
+
+# 🇰🇷 한국 표준시(KST) 시간 설정
+KST = pytz.timezone("Asia/Seoul")
+
+
+def get_kst_today():
+    return datetime.now(KST).date()
+
+
+# 한국 기준 오늘 날짜
+today = get_kst_today()
 
 
 # 전화번호 하이픈(-) 자동 변환 함수
@@ -26,7 +38,7 @@ def format_phone(phone_str):
     return phone_str
 
 
-# DB 연결 및 테이블 보정
+# DB 연결 및 보정
 def init_db():
     conn = sqlite3.connect("flower_shop.db", check_same_thread=False)
     c = conn.cursor()
@@ -76,9 +88,6 @@ def init_db():
 
 conn = init_db()
 
-# 실시간 오늘 날짜 구하기
-today = datetime.now().date()
-
 st.title("💐 Flower Shop CRM & 픽업 알림")
 
 # 사이드바 메뉴
@@ -113,7 +122,7 @@ if menu == "📝 신규 주문 및 고객 등록":
                 "주문 상품명 (예: 생일 축하 꽃다발) *"
             )
             amount = st.number_input("결제 금액 (원)", step=10000, value=50000)
-            # 기본 픽업 날짜를 접속 당일로 설정
+            # 한국 기준 오늘 날짜 자동 적용
             pickup_date = st.date_input("픽업 날짜 *", value=today)
             pickup_time = st.time_input("픽업 시간 *")
 
@@ -169,24 +178,34 @@ if menu == "📝 신규 주문 및 고객 등록":
                 except Exception as e:
                     st.error(f"저장 중 오류가 발생했습니다: {e}")
 
-# 2. 픽업 일정 확인 (달력)
+# 2. 픽업 일정 확인 (모바일 완전 최적화 UI)
 elif menu == "📅 픽업 일정 확인 (달력)":
-    st.subheader("📅 월간 픽업 달력")
+    st.subheader("📅 픽업 일정 확인")
 
-    # 선택 날짜 상태 초기화 (접속 시 무조건 오늘)
+    # 선택한 날짜 세션 초기화
     if "selected_date" not in st.session_state:
         st.session_state["selected_date"] = today
 
-    col_y, col_m = st.columns(2)
-    with col_y:
-        year = st.number_input(
-            "연도", min_value=2024, max_value=2030, value=today.year
-        )
-    with col_m:
-        month = st.number_input(
-            "월", min_value=1, max_value=12, value=today.month
-        )
+    # 상단 날짜 이동 및 선택 컨트롤
+    col_date, col_today_btn = st.columns([3, 1])
 
+    with col_date:
+        selected_date = st.date_input(
+            "📅 확인하고 싶은 날짜를 선택하세요",
+            value=st.session_state["selected_date"],
+            key="pickup_date_picker",
+        )
+        st.session_state["selected_date"] = selected_date
+
+    with col_today_btn:
+        st.write("")  # 여백 맞춤
+        st.write("")
+        if st.button("오늘 날짜로 이동", use_container_width=True):
+            st.session_state["selected_date"] = today
+            st.rerun()
+
+    # 해당 월의 전체 주문 데이터 가져오기
+    year, month = selected_date.year, selected_date.month
     start_date = f"{year}-{month:02d}-01"
     last_day = calendar.monthrange(year, month)[1]
     end_date = f"{year}-{month:02d}-{last_day} 23:59:59"
@@ -213,77 +232,67 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             df_month.groupby("날짜").size().to_dict()
         )
 
-    # 커스텀 CSS 적용 (버튼 정렬 및 텍스트 축소)
+    # 📌 깔끔한 월간 현황 요약 요약표 (깨짐 없는 HTML 표)
     st.markdown(
-        """
-        <style>
-        div[data-testid="stColumn"] {
-            padding: 2px !important;
-        }
-        div.stButton > button {
-            width: 100%;
-            padding: 4px 2px !important;
-            font-size: 12px !important;
-            min-height: 48px !important;
-        }
-        </style>
-    """,
-        unsafe_allow_html=True,
+        f"#### 🗓️ {year}년 {month}월 픽업 현황 요약 (오늘: {today.strftime('%m월 %d일')})"
     )
 
-    # 요일 헤더
-    cols_header = st.columns(7)
-    days_name = ["일", "월", "화", "수", "목", "금", "토"]
-    for i, h in enumerate(days_name):
-        color = "red" if i == 0 else ("blue" if i == 6 else "inherit")
-        cols_header[i].markdown(
-            f"<div style='text-align: center; font-weight: bold; color:{color};'>{h}</div>",
-            unsafe_allow_html=True,
-        )
-
-    # 달력 생성
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
+    html_code = """
+    <style>
+        .cal-table { width: 100%; border-collapse: collapse; text-align: center; }
+        .cal-table th { background-color: #f0f2f6; padding: 6px; font-size: 13px; border: 1px solid #ddd; }
+        .cal-table td { width: 14.28%; height: 42px; vertical-align: top; border: 1px solid #eee; padding: 2px; font-size: 12px; }
+        .is-today { background-color: #ffeeb3 !important; font-weight: bold; }
+        .is-selected { border: 2px solid #ff4b4b !important; font-weight: bold; }
+        .badge { background-color: #ff4b4b; color: white; border-radius: 6px; padding: 1px 3px; font-size: 10px; }
+        .other-m { color: #ccc; }
+    </style>
+    <table class="cal-table">
+        <thead><tr>
+            <th style="color:red;">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th style="color:blue;">토</th>
+        </tr></thead><tbody>
+    """
+
     for week in month_days:
-        cols = st.columns(7)
-        for i, day in enumerate(week):
+        html_code += "<tr>"
+        for day in week:
             if day.month == month:
                 count = counts_by_date.get(day, 0)
-                # 오늘 날짜 표시
-                is_today = " (오늘)" if day == today else ""
-                label = f"{day.day}일{is_today}"
-                if count > 0:
-                    label += f"\n[{count}건]"
+                badge = (
+                    f'<br><span class="badge">{count}건</span>'
+                    if count > 0
+                    else ""
+                )
 
-                # 날짜 버튼 클릭 시
-                if cols[i].button(label, key=f"cal_btn_{day}"):
-                    st.session_state["selected_date"] = day
-                    st.rerun()
+                classes = []
+                if day == today:
+                    classes.append("is-today")
+                if day == selected_date:
+                    classes.append("is-selected")
+
+                class_attr = (
+                    f'class="{" ".join(classes)}"' if classes else ""
+                )
+                html_code += f"<td {class_attr}>{day.day}{badge}</td>"
             else:
-                cols[i].write("")
+                html_code += f'<td class="other-m">{day.day}</td>'
+        html_code += "</tr>"
+    html_code += "</tbody></table>"
 
+    st.markdown(html_code, unsafe_allow_html=True)
+    st.write("")
+
+    # 📋 선택된 날짜 상세 내역 리스트
     st.write("---")
-
-    # 선택 날짜 표시 및 입력 피커
-    def on_date_change():
-        st.session_state["selected_date"] = st.session_state["picker_key"]
-
-    selected_date = st.date_input(
-        "🔍 상세 픽업 내역을 확인할 날짜 선택",
-        value=st.session_state["selected_date"],
-        key="picker_key",
-        on_change=on_date_change,
-    )
-
     st.markdown(
-        f"### 📋 {st.session_state['selected_date'].strftime('%Y년 %m월 %d일')} 픽업 리스트"
+        f"### 📋 {selected_date.strftime('%Y년 %m월 %d일')} 픽업 상세 리스트"
     )
 
     if not df_month.empty and "날짜" in df_month.columns:
-        df_selected = df_month[
-            df_month["날짜"] == st.session_state["selected_date"]
-        ]
+        df_selected = df_month[df_month["날짜"] == selected_date]
         if not df_selected.empty:
             show_cols = [
                 col
@@ -299,15 +308,17 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             ]
             st.dataframe(df_selected[show_cols], use_container_width=True)
         else:
-            st.info("해당 날짜에 예정된 픽업 건이 없습니다.")
+            st.info(
+                f"{selected_date.strftime('%m월 %d일')}에 예정된 픽업 건이 없습니다."
+            )
     else:
-        st.info("해당 날짜에 예정된 픽업 건이 없습니다.")
+        st.info("예정된 픽업 건이 없습니다.")
 
 # 3. 기념일 고객 관리
 elif menu == "🎉 기념일 고객 관리":
     st.subheader("🎉 이달의 기념일 고객")
 
-    current_month_str = datetime.now().strftime("%m")
+    current_month_str = datetime.now(KST).strftime("%m")
     try:
         df_customers = pd.read_sql_query(
             "SELECT name as 고객명, phone as 연락처, anniversary as 기념일, notes as 메모 FROM customers",
@@ -329,7 +340,7 @@ elif menu == "🎉 기념일 고객 관리":
 elif menu == "🔔 알림 발송 현황":
     st.subheader("🔔 자동 발송 예정 알림 대상")
 
-    now = datetime.now()
+    now = datetime.now(KST)
     tomorrow = now + timedelta(days=1)
 
     st.markdown("##### 📌 24시간 이내 픽업 예정 (1일 전 알림 대상)")
