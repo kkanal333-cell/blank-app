@@ -4,11 +4,18 @@ from sqlalchemy import create_engine, text
 
 st.set_page_config(page_title="꽃집 고객/주문 관리 시스템", layout="wide", page_icon="💐")
 
-# DB 연결
+# DB 연결 (DB_URL 키 및 postgres 키 둘 다 지원하도록 설정)
 @st.cache_resource
 def get_connection():
     try:
-        url = f"postgresql://{st.secrets['postgres']['user']}:{st.secrets['postgres']['password']}@{st.secrets['postgres']['host']}:{st.secrets['postgres']['port']}/{st.secrets['postgres']['dbname']}"
+        if "DB_URL" in st.secrets:
+            url = st.secrets["DB_URL"]
+        elif "postgres" in st.secrets:
+            pg = st.secrets["postgres"]
+            url = f"postgresql://{pg['user']}:{pg['password']}@{pg['host']}:{pg['port']}/{pg['dbname']}"
+        else:
+            st.error("Streamlit Secrets에 DB 연결 정보(DB_URL)가 없습니다.")
+            return None
         return create_engine(url)
     except Exception as e:
         st.error(f"DB 연결 실패: {e}")
@@ -94,7 +101,6 @@ if engine:
                 order_ids = df_orders['id'].tolist()
                 selected_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", order_ids)
                 
-                # 선택한 주문 정보 불러오기
                 selected_row = df_orders[df_orders['id'] == selected_id].iloc[0]
                 
                 with st.form("edit_order_form"):
@@ -172,7 +178,6 @@ if engine:
             try:
                 df_orders = pd.read_sql("SELECT * FROM orders ORDER BY id DESC", engine)
                 if not df_orders.empty:
-                    # 엑셀 한글 깨짐 방지 utf-8-sig 적용
                     csv_orders = df_orders.to_csv(index=False, encoding='utf-8-sig')
                     st.download_button(
                         label="📥 주문 내역 엑셀다운로드",
