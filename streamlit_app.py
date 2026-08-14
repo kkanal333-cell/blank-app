@@ -121,12 +121,6 @@ if engine:
     # 2. 주문 내역 관리 및 달력
     elif menu == "📋 전체 주문 목록 & 달력":
         st.header("📋 전체 주문 내역 및 픽업 달력")
-        
-        # 수정 및 삭제 완료 메시지 세션 상태 처리
-        if "msg_success" in st.session_state:
-            st.success(st.session_state.pop("msg_success"))
-        if "msg_warning" in st.session_state:
-            st.warning(st.session_state.pop("msg_warning"))
 
         try:
             query = """
@@ -180,7 +174,7 @@ if engine:
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v5")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v6")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
@@ -261,8 +255,7 @@ if engine:
                                             WHERE id=:id
                                         """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_cal_id)})
                                         conn.commit()
-                                    st.session_state["msg_success"] = f"🎉 {chosen_cal_id}번 주문이 성공적으로 수정되었습니다!"
-                                    st.rerun()
+                                    st.success(f"수정이 완료되었습니다. ({chosen_cal_id}번 주문)")
                                 except Exception as e:
                                     st.error(f"수정 실패: {e}")
                                 
@@ -271,8 +264,7 @@ if engine:
                                     with engine.connect() as conn:
                                         conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": int(chosen_cal_id)})
                                         conn.commit()
-                                    st.session_state["msg_warning"] = f"🗑️ {chosen_cal_id}번 주문이 삭제되었습니다."
-                                    st.rerun()
+                                    st.warning(f"삭제가 완료되었습니다. ({chosen_cal_id}번 주문)")
                                 except Exception as e:
                                     st.error(f"삭제 실패: {e}")
                     else:
@@ -290,7 +282,7 @@ if engine:
                     'pickup_datetime': '픽업일시', 'status': '상태'
                 }).drop(columns=['customer_id'], errors='ignore')
                 
-                # 데이터프레임 선택 이벤트 처리
+                # 데이터프레임 표시
                 event = st.dataframe(
                     display_df, 
                     use_container_width=True,
@@ -299,7 +291,6 @@ if engine:
                     key="all_orders_dataframe"
                 )
                 
-                # 세션 상태로 선택 ID 직접 동기화
                 order_ids = [int(x) for x in df_orders['id'].tolist()]
                 
                 if event and event.get("selection") and event["selection"].get("rows"):
@@ -372,8 +363,8 @@ if engine:
                                         WHERE id=:id
                                     """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_id)})
                                     conn.commit()
-                                st.session_state["msg_success"] = f"🎉 {chosen_id}번 주문 수정이 완료되었습니다!"
-                                st.rerun()
+                                # 강제 새로고침(st.rerun)을 제거하여 화면을 그대로 유지하고 완료 멘트만 출력
+                                st.success("수정이 완료되었습니다.")
                             except Exception as e:
                                 st.error(f"수정 실패: {e}")
                             
@@ -382,8 +373,7 @@ if engine:
                                 with engine.connect() as conn:
                                     conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": int(chosen_id)})
                                     conn.commit()
-                                st.session_state["msg_warning"] = f"🗑️ {chosen_id}번 주문이 삭제되었습니다."
-                                st.rerun()
+                                st.warning("삭제가 완료되었습니다.")
                             except Exception as e:
                                 st.error(f"삭제 실패: {e}")
         except Exception as e:
@@ -405,7 +395,6 @@ if engine:
                     conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p)"), {"n": name, "p": phone})
                     conn.commit()
                 st.success(f"'{name}' 고객님이 등록되었습니다!")
-                st.rerun()
                 
         try:
             df_customers = pd.read_sql("SELECT id as ID, name as 고객명, phone as 연락처 FROM customers ORDER BY id DESC", engine)
