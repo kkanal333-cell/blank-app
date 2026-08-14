@@ -75,10 +75,10 @@ def get_kst_now():
 def parse_time_with_period(period, t_val):
     hour = t_val.hour
     minute = t_val.minute
-    if period == "PM" or period == "오후":
+    if period in ["PM", "오후"]:
         if hour < 12:
             hour += 12
-    elif period == "AM" or period == "오전":
+    elif period in ["AM", "오전"]:
         if hour == 12:
             hour = 0
     return time(hour, minute)
@@ -99,6 +99,20 @@ def format_phone(phone_number):
         return f"{numbers[:3]}-{numbers[3:]}"
     else:
         return numbers
+
+# 완벽 안전 KST 날짜 변환 함수
+def parse_to_kst_series(series):
+    def _to_kst_ts(val):
+        if pd.isna(val) or val is None:
+            return pd.NaT
+        try:
+            ts = pd.Timestamp(val)
+            if ts.tzinfo is None or ts.tz is None:
+                return ts.tz_localize('Asia/Seoul')
+            return ts.tz_convert('Asia/Seoul')
+        except Exception:
+            return pd.NaT
+    return pd.to_datetime(series.apply(_to_kst_ts))
 
 @st.cache_resource
 def get_connection():
@@ -243,15 +257,8 @@ if engine:
             df_orders = pd.read_sql(query, engine)
             
             if not df_orders.empty:
-                def safe_to_kst(series):
-                    dt_series = pd.to_datetime(series, format='mixed', errors='coerce')
-                    if dt_series.dt.tz is None:
-                        return dt_series.dt.tz_localize('Asia/Seoul', ambiguous='NaT', nonexistent='NaT')
-                    else:
-                        return dt_series.dt.tz_convert('Asia/Seoul')
-
-                df_orders['pickup_datetime'] = safe_to_kst(df_orders['pickup_datetime'])
-                df_orders['created_at'] = safe_to_kst(df_orders['created_at'])
+                df_orders['pickup_datetime'] = parse_to_kst_series(df_orders['pickup_datetime'])
+                df_orders['created_at'] = parse_to_kst_series(df_orders['created_at'])
 
             def get_pastel_color(pm):
                 if pm == '네이버': return "#E0F2FE"
@@ -290,13 +297,17 @@ if engine:
                         "timeZone": "Asia/Seoul",
                         "selectable": True
                     }, 
-                    key="calendar_kst_v11"
+                    key="calendar_kst_v12"
                 )
                 
                 if cal_res:
                     if cal_res.get("dateClick"):
                         raw_date_str = cal_res["dateClick"]["date"]
-                        parsed_dt = pd.to_datetime(raw_date_str, format='mixed').tz_convert('Asia/Seoul')
+                        parsed_dt = pd.Timestamp(raw_date_str)
+                        if parsed_dt.tzinfo is None:
+                            parsed_dt = parsed_dt.tz_localize('Asia/Seoul')
+                        else:
+                            parsed_dt = parsed_dt.tz_convert('Asia/Seoul')
                         kst_date_str = parsed_dt.strftime('%Y-%m-%d')
                         
                         if st.session_state.get("selected_calendar_date") != kst_date_str:
