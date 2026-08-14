@@ -288,7 +288,6 @@ if engine:
                 )
                 
                 if cal_res:
-                    # UTC 날짜 스트링을 한국 날짜로 일치시킴
                     if cal_res.get("dateClick"):
                         raw_date_str = cal_res["dateClick"]["date"]
                         parsed_dt = pd.to_datetime(raw_date_str).tz_convert('Asia/Seoul')
@@ -482,7 +481,7 @@ if engine:
                                     st.success(f"주문번호 #{selected_id}번 수정이 완료되었습니다!")
                                     st.session_state["edit_order_id"] = None
                                     st.rerun()
-                                meexcept Exception as e:
+                                except Exception as e:
                                     st.error(f"수정 실패: {e}")
 
         except Exception as e:
