@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 
 st.set_page_config(page_title="꽃집 고객/주문 관리 시스템", layout="wide", page_icon="💐")
 
-# DB 연결 (DB_URL 키 및 postgres 키 둘 다 지원하도록 설정)
+# DB 연결
 @st.cache_resource
 def get_connection():
     try:
@@ -14,7 +14,7 @@ def get_connection():
             pg = st.secrets["postgres"]
             url = f"postgresql://{pg['user']}:{pg['password']}@{pg['host']}:{pg['port']}/{pg['dbname']}"
         else:
-            st.error("Streamlit Secrets에 DB 연결 정보(DB_URL)가 없습니다.")
+            st.error("Streamlit Secrets에 DB 연결 정보가 없습니다.")
             return None
         return create_engine(url)
     except Exception as e:
@@ -23,7 +23,7 @@ def get_connection():
 
 engine = get_connection()
 
-# DB 테이블 생성
+# DB 테이블 호환성 확인 및 기본 생성
 if engine:
     with engine.connect() as conn:
         conn.execute(text("""
@@ -31,22 +31,20 @@ if engine:
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100),
                 phone VARCHAR(50),
-                memo TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                memo TEXT
             );
         """))
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS orders (
                 id SERIAL PRIMARY KEY,
-                customer_name VARCHAR(100),
+                name VARCHAR(100),
                 phone VARCHAR(50),
                 product_name VARCHAR(100),
                 price INT,
                 order_date DATE,
                 delivery_date DATE,
                 status VARCHAR(50),
-                memo TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                memo TEXT
             );
         """))
         conn.commit()
@@ -80,7 +78,7 @@ if engine:
                 else:
                     with engine.connect() as conn:
                         conn.execute(text("""
-                            INSERT INTO orders (customer_name, phone, product_name, price, order_date, delivery_date, status, memo)
+                            INSERT INTO orders (name, phone, product_name, price, order_date, delivery_date, status, memo)
                             VALUES (:c, :p, :pr, :prc, :od, :dd, :st, :m)
                         """), {"c": customer_name, "p": phone, "pr": product_name, "prc": price, "od": order_date, "dd": delivery_date, "st": status, "m": memo})
                         conn.commit()
@@ -91,7 +89,7 @@ if engine:
         st.header("📋 전체 주문 내역 및 수정/삭제")
         
         try:
-            df_orders = pd.read_sql("SELECT id, customer_name as 고객명, phone as 연락처, product_name as 상품명, price as 금액, order_date as 주문일, delivery_date as 배송일, status as 상태, memo as 메모 FROM orders ORDER BY id DESC", engine)
+            df_orders = pd.read_sql("SELECT id, name as 고객명, phone as 연락처, product_name as 상품명, price as 금액, order_date as 주문일, delivery_date as 배송일, status as 상태, memo as 메모 FROM orders ORDER BY id DESC", engine)
             st.dataframe(df_orders, use_container_width=True)
             
             if not df_orders.empty:
@@ -106,13 +104,13 @@ if engine:
                 with st.form("edit_order_form"):
                     col1, col2 = st.columns(2)
                     with col1:
-                        edit_name = st.text_input("고객명", value=selected_row['고객명'])
+                        edit_name = st.text_input("고객명", value=selected_row['고객명'] or "")
                         edit_phone = st.text_input("연락처", value=selected_row['연락처'] or "")
-                        edit_product = st.text_input("상품명", value=selected_row['상품명'])
+                        edit_product = st.text_input("상품명", value=selected_row['상품명'] or "")
                         edit_price = st.number_input("금액 (원)", min_value=0, step=1000, value=int(selected_row['금액'] or 0))
                     with col2:
-                        edit_order_date = st.date_input("주문일", value=pd.to_datetime(selected_row['주문일']))
-                        edit_delivery_date = st.date_input("배송일", value=pd.to_datetime(selected_row['배송일']))
+                        edit_order_date = st.date_input("주문일", value=pd.to_datetime(selected_row['주문일']) if pd.notnull(selected_row['주문일']) else None)
+                        edit_delivery_date = st.date_input("배송일", value=pd.to_datetime(selected_row['배송일']) if pd.notnull(selected_row['배송일']) else None)
                         
                         status_list = ["접수", "제작중", "배송중", "완료", "취소"]
                         curr_status_idx = status_list.index(selected_row['상태']) if selected_row['상태'] in status_list else 0
@@ -130,7 +128,7 @@ if engine:
                         with engine.connect() as conn:
                             conn.execute(text("""
                                 UPDATE orders 
-                                SET customer_name=:c, phone=:p, product_name=:pr, price=:prc, order_date=:od, delivery_date=:dd, status=:st, memo=:m
+                                SET name=:c, phone=:p, product_name=:pr, price=:prc, order_date=:od, delivery_date=:dd, status=:st, memo=:m
                                 WHERE id=:id
                             """), {"c": edit_name, "p": edit_phone, "pr": edit_product, "prc": edit_price, "od": edit_order_date, "dd": edit_delivery_date, "st": edit_status, "m": edit_memo, "id": selected_id})
                             conn.commit()
@@ -164,10 +162,13 @@ if engine:
                 st.success(f"'{name}' 고객님이 등록되었습니다!")
                 st.rerun()
                 
-        df_customers = pd.read_sql("SELECT id, name as 고객명, phone as 연락처, memo as 메모, created_at as 등록일 FROM customers ORDER BY id DESC", engine)
-        st.dataframe(df_customers, use_container_width=True)
+        try:
+            df_customers = pd.read_sql("SELECT id, name as 고객명, phone as 연락처, memo as 메모 FROM customers ORDER BY id DESC", engine)
+            st.dataframe(df_customers, use_container_width=True)
+        except Exception as e:
+            st.error(f"고객 목록을 가져오는 중 오류가 발생했습니다: {e}")
 
-    # 4. 데이터 CSV 백업 (한글 깨짐 해결 BOM 포함)
+    # 4. 데이터 CSV 백업
     elif menu == "📥 데이터 CSV 백업":
         st.header("📥 데이터 CSV 백업 (엑셀 저장)")
         st.write("엑셀에서 한글이 깨지지 않도록 인코딩(UTF-8 BOM) 처리된 파일입니다.")
