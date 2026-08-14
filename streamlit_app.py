@@ -102,15 +102,6 @@ def format_phone(phone_number):
     else:
         return numbers
 
-# 세션 상태 초기화 (휴대폰 번호 기본값 010-)
-if 'phone_val' not in st.session_state:
-    st.session_state.phone_val = "010-"
-
-def on_phone_change():
-    raw = st.session_state.phone_input_key
-    formatted = format_phone(raw)
-    st.session_state.phone_val = formatted
-
 @st.cache_resource
 def get_connection():
     try:
@@ -158,19 +149,13 @@ if engine:
         st.header("📝 신규 주문 및 고객 등록")
         now_kst = get_kst_now()
         
-        with st.form("order_form", clear_on_submit=False):
+        with st.form("order_form", clear_on_submit=True):
             # 1줄: 고객 성명, 휴대폰번호
             col1, col2 = st.columns(2)
             with col1:
                 customer_name = st.text_input("고객 성명 *")
             with col2:
-                phone = st.text_input(
-                    "휴대폰 번호", 
-                    value=st.session_state.phone_val, 
-                    key="phone_input_key", 
-                    on_change=on_phone_change,
-                    placeholder="010-0000-0000"
-                )
+                phone_input = st.text_input("휴대폰 번호", value="010-", placeholder="010-0000-0000")
             
             # 2줄: 주문상품명, 결제 금액
             col3, col4 = st.columns(2)
@@ -208,6 +193,7 @@ if engine:
                     st.warning("고객 성명은 필수 입력 항목입니다.")
                 else:
                     try:
+                        formatted_phone = format_phone(phone_input)
                         order_time = parse_time_with_period(order_period, order_time_input)
                         pickup_time = parse_time_with_period(pickup_period, pickup_time_input)
                         
@@ -215,11 +201,11 @@ if engine:
                         pickup_datetime = datetime.combine(pickup_date, pickup_time)
                         
                         with engine.connect() as conn:
-                            res = conn.execute(text("SELECT id FROM customers WHERE name = :n AND phone = :p LIMIT 1"), {"n": customer_name, "p": phone}).fetchone()
+                            res = conn.execute(text("SELECT id FROM customers WHERE name = :n AND phone = :p LIMIT 1"), {"n": customer_name, "p": formatted_phone}).fetchone()
                             if res:
                                 customer_id = int(res[0])
                             else:
-                                ins_res = conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p) RETURNING id"), {"n": customer_name, "p": phone})
+                                ins_res = conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p) RETURNING id"), {"n": customer_name, "p": formatted_phone})
                                 customer_id = int(ins_res.fetchone()[0])
                             
                             conn.execute(text("""
@@ -238,7 +224,6 @@ if engine:
                             })
                             conn.commit()
                         st.success(f"'{customer_name}'님의 주문이 성공적으로 저장되었습니다!")
-                        st.session_state.phone_val = "010-"
                     except Exception as e:
                         st.error(f"저장 실패: {e}")
 
