@@ -9,7 +9,7 @@ from streamlit_calendar import calendar
 # 페이지 기본 설정
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리", layout="wide", page_icon="💐")
 
-# 스타일 설정: 이전의 안정적인 폰트/크기로 복원 및 모바일 대응 플렉스 레이아웃
+# 스타일 설정: 안정적인 폰트/크기 및 모바일 대응 플렉스 레이아웃
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -266,15 +266,20 @@ if engine:
                 cal_res = calendar(events=calendar_events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": ""}, "initialView": "dayGridMonth", "height": 500}, key="calendar_v3")
                 
                 clicked_date_str = None
+                clicked_event_id = None
+
                 if cal_res and cal_res.get("dateClick"):
                     raw_date_str = cal_res["dateClick"]["date"]
                     base_date = pd.to_datetime(str(raw_date_str)[:10])
-                    # [완벽 해결] 타임존 오차로 인해 하루 전으로 깎이는 현상을 보정하기 위해 +1일 적용
                     corrected_date = base_date + timedelta(days=1)
                     clicked_date_str = corrected_date.strftime('%Y-%m-%d')
                 elif cal_res and cal_res.get("eventClick"):
-                    evt_start = cal_res["eventClick"]["event"]["start"]
-                    clicked_date_str = str(evt_start)[:10]
+                    evt = cal_res["eventClick"]["event"]
+                    clicked_event_id = int(evt["id"])
+                    clicked_date_str = str(evt["start"])[:10]
+
+                if clicked_event_id:
+                    st.session_state["edit_order_id"] = clicked_event_id
 
                 if clicked_date_str:
                     st.subheader(f"📌 {clicked_date_str} 픽업 주문 목록")
@@ -298,6 +303,130 @@ if engine:
                     'pickup_datetime': '픽업일시', 'payment_method': '결제내역', 'memo': '메모'
                 }).drop(columns=['customer_id'], errors='ignore')
                 st.dataframe(display_df, use_container_width=True)
+
+            st.markdown("---")
+            st.subheader("✏️ 주문 수정하기")
+            order_ids = df_orders['id'].tolist()
+            order_labels = [f"주문번호 #{row['id']} | {row['customer_name']} ({row['product_name']}) - {row['pickup_datetime']}" for _, row in df_orders.iterrows()]
+            
+            default_index = 0
+            if "edit_order_id" in st.session_state and st.session_state["edit_order_id"] in order_ids:
+                default_index = order_ids.index(st.session_state["edit_order_id"])
+
+            selected_label = st.selectbox("수정할 주문을 선택하세요 (목록 또는 달력의 일정 클릭 시 자동 지정)", order_labels, index=default_index, key="selected_order_selectbox")
+            selected_id = order_ids[order_labels.index(selected_label)]
+            st.session_state["edit_order_id"] = selected_id
+
+            target_row = df_orders[df_orders['id'] == selected_id].iloc[0]
+
+            # 기존 데이터 파싱
+            orig_cname = target_row['customer_name'] if pd.notnull(target_row['customer_name']) else ""
+            orig_phone = target_row['phone'] if pd.notnull(target_row['phone']) else "010-"
+            orig_prod = target_row['product_name'] if pd.notnull(target_row['product_name']) and target_row['product_name'] in PRODUCT_OPTIONS else PRODUCT_OPTIONS[0]
+            orig_amount = int(target_row['amount']) if pd.notnull(target_row['amount']) else 55000
+            
+            orig_pdt = pd.to_datetime(target_row['pickup_datetime']) if pd.notnull(target_row['pickup_datetime']) else datetime.now()
+            orig_p_date = orig_pdt.date()
+            orig_p_hour = orig_pdt.hour
+            orig_p_period = "PM" if orig_p_hour >= 12 else "AM"
+            orig_p_hour_12 = orig_p_hour if orig_p_hour <= 12 else orig_p_hour - 12
+            orig_p_hour_12 = 12 if orig_p_hour_12 == 0 else orig_p_hour_12
+            orig_p_time = time(orig_p_hour_12, orig_pdt.minute)
+
+            orig_cat = pd.to_datetime(target_row['created_at']) if pd.notnull(target_row['created_at']) else datetime.now()
+            orig_o_date = orig_cat.date()
+            orig_o_hour = orig_cat.hour
+            orig_o_period = "PM" if orig_o_hour >= 12 else "AM"
+            orig_o_hour_12 = orig_o_hour if orig_o_hour <= 12 else orig_o_hour - 12
+            orig_o_hour_12 = 12 if orig_o_hour_12 == 0 else orig_o_hour_12
+            orig_o_time = time(orig_o_hour_12, orig_cat.minute)
+
+            orig_pm = target_row['payment_method'] if pd.notnull(target_row['payment_method']) and target_row['payment_method'] in PAYMENT_OPTIONS else PAYMENT_OPTIONS[0]
+            orig_memo = target_row['memo'] if pd.notnull(target_row['memo']) else ""
+
+            with st.form(f"edit_form_{selected_id}"):
+                ec1, ec2 = st.columns(2)
+                with ec1:
+                    edit_cname = st.text_input("고객 성명 *", value=orig_cname, key="edit_cname")
+                with ec2:
+                    edit_phone = st.text_input("휴대폰 번호", value=orig_phone, key="edit_phone")
+                
+                ec3, ec4 = st.columns(2)
+                with ec3:
+                    edit_prod = st.selectbox("주문 상품명 *", PRODUCT_OPTIONS, index=PRODUCT_OPTIONS.index(orig_prod), key="edit_prod")
+                with ec4:
+                    edit_amount = st.number_input("결제 금액 (원)", min_value=0, step=5000, value=orig_amount, key="edit_amount")
+                
+                st.markdown('<div class="custom-row-label">픽업 일시 *</div>', unsafe_allow_html=True)
+                st.markdown('<div class="datetime-inline-wrapper">', unsafe_allow_html=True)
+                ep_1, ep_2, ep_3 = st.columns([2.2, 1, 1.3])
+                with ep_1:
+                    edit_p_date = st.date_input("픽업 날짜", value=orig_p_date, label_visibility="collapsed", key="edit_p_date")
+                with ep_2:
+                    edit_p_period = st.selectbox("픽업 AM/PM", ["PM", "AM"], index=0 if orig_p_period=="PM" else 1, label_visibility="collapsed", key="edit_p_period")
+                with ep_3:
+                    edit_p_time_val = st.time_input("픽업 시간", value=orig_p_time, label_visibility="collapsed", key="edit_p_time")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                st.markdown('<div class="custom-row-label">접수 일시 *</div>', unsafe_allow_html=True)
+                st.markdown('<div class="datetime-inline-wrapper">', unsafe_allow_html=True)
+                eo_1, eo_2, eo_3 = st.columns([2.2, 1, 1.3])
+                with eo_1:
+                    edit_o_date = st.date_input("접수 날짜", value=orig_o_date, label_visibility="collapsed", key="edit_o_date")
+                with eo_2:
+                    edit_o_period = st.selectbox("접수 AM/PM", ["AM", "PM"], index=0 if orig_o_period=="AM" else 1, label_visibility="collapsed", key="edit_o_period")
+                with eo_3:
+                    edit_o_time_val = st.time_input("접수 시간", value=orig_o_time, label_visibility="collapsed", key="edit_o_time")
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                edit_pm = st.selectbox("결제내역 *", PAYMENT_OPTIONS, index=PAYMENT_OPTIONS.index(orig_pm), key="edit_pm")
+                edit_memo = st.text_area("고객 요구사항 / 메모", value=orig_memo, placeholder="요구사항이나 특이사항을 적어주세요.", height=85, key="edit_memo")
+                
+                update_submit = st.form_submit_button("✨ 수정 사항 저장하기", use_container_width=True)
+                if update_submit:
+                    if not edit_cname:
+                        st.warning("고객 성명은 필수 입력 항목입니다.")
+                    else:
+                        try:
+                            f_phone = format_phone(edit_phone)
+                            new_order_time = parse_time_with_period(edit_o_period, edit_o_time_val)
+                            new_pickup_time = parse_time_with_period(edit_p_period, edit_p_time_val)
+                            
+                            new_order_dt = datetime.combine(edit_o_date, new_order_time)
+                            new_pickup_dt = datetime.combine(edit_p_date, new_pickup_time)
+                            
+                            with engine.connect() as conn:
+                                # 고객 정보 업데이트 또는 생성
+                                res = conn.execute(text("SELECT id FROM customers WHERE name = :n AND phone = :p LIMIT 1"), {"n": edit_cname, "p": f_phone}).fetchone()
+                                if res:
+                                    customer_id = int(res[0])
+                                else:
+                                    ins_res = conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p) RETURNING id"), {"n": edit_cname, "p": f_phone})
+                                    customer_id = int(ins_res.fetchone()[0])
+                                
+                                conn.execute(text("""
+                                    UPDATE orders 
+                                    SET customer_id = :cid, product_name = :pn, product = :p, amount = :am, 
+                                        pickup_datetime = :pdt, status = :st, payment_method = :pm, memo = :memo, created_at = :cat
+                                    WHERE id = :oid
+                                """), {
+                                    "cid": customer_id,
+                                    "pn": edit_prod,
+                                    "p": edit_prod,
+                                    "am": int(edit_amount),
+                                    "pdt": new_pickup_dt,
+                                    "st": edit_pm,
+                                    "pm": edit_pm,
+                                    "memo": edit_memo,
+                                    "cat": new_order_dt,
+                                    "oid": selected_id
+                                })
+                                conn.commit()
+                            st.success(f"주문번호 #{selected_id}번 수정이 완료되었습니다!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"수정 실패: {e}")
+
         except Exception as e:
             st.error(f"목록 조회 오류: {e}")
 
