@@ -1,6 +1,2 @@
-streamlit
-pandas
+streamlit==1.38.0
 pytz
-sqlalchemy
-psycopg2-binary
-streamlit-calendar
