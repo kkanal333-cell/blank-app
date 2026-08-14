@@ -9,13 +9,29 @@ from streamlit_calendar import calendar
 # 페이지 기본 설정
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리", layout="wide", page_icon="💐")
 
-# 스타일 설정: 이전의 안정적인 폰트/크기로 복원 및 모바일 대응 플렉스 레이아웃
+# 스타일 설정: 간판 느낌의 짙은 보라색 타이틀, 로고 스타일 및 기존 폼 레이아웃 유지
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
     html, body, [class*="css"], .stMarkdown, p, div, span, button, input, select {
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    }
+
+    /* 간판 스타일 커스텀 타이틀 */
+    .brand-title-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 1.5rem;
+        margin-top: 0.5rem;
+    }
+    .brand-title-text {
+        font-family: 'Pretendard', sans-serif;
+        font-size: 1.65rem;
+        font-weight: 700;
+        color: #4A2E65;
+        letter-spacing: -0.5px;
     }
 
     div[data-testid="stForm"] {
@@ -43,7 +59,6 @@ st.markdown("""
         display: block !important;
     }
 
-    /* PC에서는 가로 한 줄, 모바일 세로 화면에서는 비율에 맞게 자연스럽게 배치되도록 설정 */
     .datetime-inline-wrapper {
         display: flex !important;
         flex-direction: row !important;
@@ -124,7 +139,24 @@ if engine:
     except Exception as e:
         pass
 
-st.title("💐 화사한 하루 고객 & 주문 관리")
+# 간판 디자인과 일치하는 꽃 로고 및 짙은 보라색 타이틀 렌더링
+flower_svg = """
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4A2E65" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 21v-8"></path>
+  <path d="M12 13c-2.5 0-4-1.5-4-4s1.5-4 4-4 4 1.5 4 4-1.5 4-4 4z"></path>
+  <circle cx="12" cy="9" r="1.5"></circle>
+  <path d="M9.5 16.5c-2 1-3 3-3 4"></path>
+  <path d="M14.5 14.5c1.5.8 2.5 2.2 2.8 3.5"></path>
+  <circle cx="6.5" cy="5.5" r="1"></circle>
+</svg>
+"""
+
+st.markdown(f"""
+<div class="brand-title-container">
+    {flower_svg}
+    <span class="brand-title-text">화사한 하루</span>
+</div>
+""", unsafe_allow_html=True)
 
 PAYMENT_OPTIONS = ["네이버", "전화", "입금", "현금", "미결제"]
 PRODUCT_OPTIONS = ["꽃다발", "꽃바구니", "햇살콘플라워", "꽃묶음", "식물", "용품", "시즌한정", "기타"]
@@ -147,21 +179,18 @@ if engine:
         now_kst = get_kst_now()
         
         with st.form("order_form", clear_on_submit=True):
-            # 1줄: 고객 성명, 휴대폰번호
             col1, col2 = st.columns(2)
             with col1:
                 customer_name = st.text_input("고객 성명 *")
             with col2:
                 phone_input = st.text_input("휴대폰 번호", value="010-", placeholder="010-0000-0000")
             
-            # 2줄: 주문상품명, 결제 금액
             col3, col4 = st.columns(2)
             with col3:
                 product_name = st.selectbox("주문 상품명 *", PRODUCT_OPTIONS)
             with col4:
                 amount = st.number_input("결제 금액 (원)", min_value=0, step=5000, value=55000)
             
-            # 3줄: 픽업일시
             st.markdown('<div class="custom-row-label">픽업 일시 *</div>', unsafe_allow_html=True)
             st.markdown('<div class="datetime-inline-wrapper">', unsafe_allow_html=True)
             p_col1, p_col2, p_col3 = st.columns([2.2, 1, 1.3])
@@ -173,7 +202,6 @@ if engine:
                 pickup_time_input = st.time_input("픽업 시간", time(2, 0), label_visibility="collapsed", key="reg_p_time")
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # 접수일시
             st.markdown('<div class="custom-row-label">접수 일시 *</div>', unsafe_allow_html=True)
             st.markdown('<div class="datetime-inline-wrapper">', unsafe_allow_html=True)
             o_col1, o_col2, o_col3 = st.columns([2.2, 1, 1.3])
@@ -187,10 +215,7 @@ if engine:
                 order_time_input = st.time_input("접수 시간", time(curr_12h, now_kst.minute), label_visibility="collapsed", key="reg_o_time")
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # 4줄: 결제내역
             payment_method = st.selectbox("결제내역 *", PAYMENT_OPTIONS)
-            
-            # 5줄: 고객 요구사항 / 메모
             memo = st.text_area("고객 요구사항 / 메모", placeholder="요구사항이나 특이사항을 적어주세요.", height=85)
             
             submit = st.form_submit_button("🌸 주문 저장하기", use_container_width=True)
@@ -255,7 +280,7 @@ if engine:
                 elif pm == '현금': return "#FEF08A"
                 else: return "#FEE2E2"
 
-            tab1, tab2 = st.tabs(["📅 픽업 달력", "📊 전체 주문 목록"])
+            tab1, tab2, tab3 = st.tabs(["📅 픽업 달력", "📊 전체 주문 목록", "✏️ 주문 수정/삭제"])
 
             with tab1:
                 calendar_events = []
@@ -303,6 +328,64 @@ if engine:
                     'pickup_datetime': '픽업일시', 'payment_method': '결제내역', 'memo': '메모'
                 }).drop(columns=['customer_id'], errors='ignore')
                 st.dataframe(display_df, use_container_width=True)
+
+            with tab3:
+                st.subheader("✏️ 기존 주문 정보 수정 또는 삭제")
+                if df_orders.empty:
+                    st.info("수정할 주문 내역이 없습니다.")
+                else:
+                    order_options = {f"주문ID {row['id']} | {row['customer_name']} - {row['product_name']} ({row['pickup_datetime']})": row['id'] for _, row in df_orders.iterrows()}
+                    selected_order_label = st.selectbox("수정할 주문을 선택하세요", list(order_options.keys()))
+                    selected_order_id = order_options[selected_order_label]
+                    
+                    target_row = df_orders[df_orders['id'] == selected_order_id].iloc[0]
+                    
+                    with st.form("edit_order_form"):
+                        e_prod = st.selectbox("상품명", PRODUCT_OPTIONS, index=PRODUCT_OPTIONS.index(target_row['product_name']) if target_row['product_name'] in PRODUCT_OPTIONS else 0)
+                        e_amount = st.number_input("결제 금액 (원)", value=int(target_row['amount']) if pd.notnull(target_row['amount']) else 0, step=5000)
+                        e_pm = st.selectbox("결제내역", PAYMENT_OPTIONS, index=PAYMENT_OPTIONS.index(target_row['payment_method']) if target_row['payment_method'] in PAYMENT_OPTIONS else 0)
+                        
+                        orig_pdt = pd.to_datetime(target_row['pickup_datetime']) if pd.notnull(target_row['pickup_datetime']) else datetime.now()
+                        e_p_date = st.date_input("픽업 날짜", orig_pdt.date())
+                        e_p_time = st.time_input("픽업 시간", orig_pdt.time())
+                        
+                        e_memo = st.text_area("고객 요구사항 / 메모", value=target_row['memo'] if pd.notnull(target_row['memo']) else "")
+                        
+                        col_upd, col_del = st.columns(2)
+                        with col_upd:
+                            update_submitted = st.form_submit_button("💾 주문 정보 수정 저장", use_container_width=True)
+                        with col_del:
+                            delete_submitted = st.form_submit_button("🗑️ 주문 삭제", use_container_width=True)
+                            
+                        if update_submitted:
+                            try:
+                                new_pdt = datetime.combine(e_p_date, e_p_time)
+                                with engine.connect() as conn:
+                                    conn.execute(text("""
+                                        UPDATE orders 
+                                        SET product_name = :pn, product = :pn, amount = :am, 
+                                            payment_method = :pm, status = :pm, pickup_datetime = :pdt, memo = :memo
+                                        WHERE id = :oid
+                                    """), {
+                                        "pn": e_prod, "am": int(e_amount), "pm": e_pm,
+                                        "pdt": new_pdt, "memo": e_memo, "oid": selected_order_id
+                                    })
+                                    conn.commit()
+                                st.success("주문 정보가 성공적으로 수정되었습니다!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"수정 실패: {e}")
+                                
+                        if delete_submitted:
+                            try:
+                                with engine.connect() as conn:
+                                    conn.execute(text("DELETE FROM orders WHERE id = :oid"), {"oid": selected_order_id})
+                                    conn.commit()
+                                st.success("주문이 삭제되었습니다!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"삭제 실패: {e}")
+
         except Exception as e:
             st.error(f"목록 조회 오류: {e}")
 
