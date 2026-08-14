@@ -254,7 +254,7 @@ if engine:
                 for _, row in df_orders.iterrows():
                     if pd.notnull(row['pickup_datetime']):
                         p_dt = pd.to_datetime(row['pickup_datetime'])
-                        pm = row['payment_method'] or "입금"
+                        pm = row['payment_method'] || "입금" # type: ignore
                         color = get_pastel_color(pm)
                         calendar_events.append({
                             "id": str(int(row['id'])),
@@ -268,11 +268,11 @@ if engine:
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
                     raw_date_str = cal_res["dateClick"]["date"]
-                    # 날짜 문자열 파싱 후 하루 전으로 밀리는 현상을 막기 위해 로컬 날짜 문자열 그대로 추출
-                    clicked_date_str = pd.to_datetime(raw_date_str).strftime("%Y-%m-%d")
+                    # [수정] UTC 변환으로 인한 하루 밀림 방지: 문자열의 앞 10자리(YYYY-MM-DD)를 직접 가져옴
+                    clicked_date_str = str(raw_date_str)[:10]
                 elif cal_res and cal_res.get("eventClick"):
                     evt_start = cal_res["eventClick"]["event"]["start"]
-                    clicked_date_str = pd.to_datetime(evt_start).strftime("%Y-%m-%d")
+                    clicked_date_str = str(evt_start)[:10]
 
                 if clicked_date_str:
                     st.subheader(f"📌 {clicked_date_str} 픽업 주문 목록")
@@ -287,7 +287,7 @@ if engine:
                         }).drop(columns=['customer_id', 'pickup_date_only'], errors='ignore')
                         st.dataframe(disp_day_df, use_container_width=True)
                     else:
-                        st.info(f"{clicked_date_str}에예정된 픽업 주문이 없습니다.")
+                        st.info(f"{clicked_date_str}에 예정된 픽업 주문이 없습니다.")
 
             with tab2:
                 display_df = df_orders.rename(columns={
