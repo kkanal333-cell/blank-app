@@ -1,9 +1,10 @@
 import calendar
 import datetime
 from datetime import datetime, timedelta, timezone
+import os
 import re
 import pandas as pd
-import sqlite3
+from sqlalchemy import create_engine, text
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -38,55 +39,62 @@ def format_phone(phone_str):
     return phone_str
 
 
-# DB 연결 및 보정
+# 🗄️ Supabase / SQLAlchemy DB 엔진 연결
+@st.cache_resource
+def get_db_engine():
+    if "DB_URL" in st.secrets:
+        db_url = st.secrets["DB_URL"]
+    else:
+        # 로컬 테스트용 SQLite Fallback
+        db_url = "sqlite:///flower_shop.db"
+
+    # PostgreSQL 연결 시 sslmode 설정 및 postgresql:// 프로토콜 보정
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+    return create_engine(db_url, pool_pre_ping=True)
+
+
+engine = get_db_engine()
+
+
+# DB 테이블 자동 생성 및 초기화
 def init_db():
-    conn = sqlite3.connect("flower_shop.db", check_same_thread=False)
-    c = conn.cursor()
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS customers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            phone TEXT UNIQUE NOT NULL,
-            anniversary TEXT,
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    with engine.begin() as conn:
+        # 고객 테이블
+        conn.execute(
+            text("""
+            CREATE TABLE IF NOT EXISTS customers (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                phone VARCHAR(50) UNIQUE NOT NULL,
+                anniversary VARCHAR(100),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
         )
-    """)
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customer_id INTEGER,
-            product_name TEXT,
-            product TEXT,
-            amount INTEGER DEFAULT 0,
-            pickup_datetime TEXT NOT NULL,
-            status TEXT DEFAULT '접수',
-            notified_1day INTEGER DEFAULT 0,
-            notified_1hour INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (customer_id) REFERENCES customers (id)
+        # 주문 테이블
+        conn.execute(
+            text("""
+            CREATE TABLE IF NOT EXISTS orders (
+                id SERIAL PRIMARY KEY,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+                product_name TEXT,
+                product TEXT,
+                amount INTEGER DEFAULT 0,
+                pickup_datetime VARCHAR(50) NOT NULL,
+                status VARCHAR(20) DEFAULT '접수',
+                notified_1day INTEGER DEFAULT 0,
+                notified_1hour INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
         )
-    """)
-
-    c.execute("PRAGMA table_info(orders)")
-    columns = [col[1] for col in c.fetchall()]
-
-    if "product_name" not in columns:
-        c.execute(
-            "ALTER TABLE orders ADD COLUMN product_name TEXT DEFAULT ''"
-        )
-    if "product" not in columns:
-        c.execute("ALTER TABLE orders ADD COLUMN product TEXT DEFAULT ''")
-    if "amount" not in columns:
-        c.execute("ALTER TABLE orders ADD COLUMN amount INTEGER DEFAULT 0")
-
-    conn.commit()
-    return conn
 
 
-conn = init_db()
+init_db()
 
 st.title("💐 Flower Shop CRM & 픽업 알림")
 
@@ -153,44 +161,59 @@ if menu == "📝 신규 주문 및 고객 등록":
             else:
                 formatted_phone = format_phone(phone_input)
                 try:
-                    c = conn.cursor()
-                    c.execute(
-                        "SELECT id FROM customers WHERE phone = ?",
-                        (formatted_phone,),
-                    )
-                    row = c.fetchone()
+                    with engine.begin() as conn:
+                        # 고객 조회
+                        result = conn.execute(
+                            text(
+                                "SELECT id FROM customers WHERE phone = :phone"
+                            ),
+                            {"phone": formatted_phone},
+                        ).fetchone()
 
-                    if row:
-                        customer_id = row[0]
-                        c.execute(
-                            "UPDATE customers SET name=?, anniversary=?, notes=? WHERE id=?",
-                            (name, anniversary, notes, customer_id),
+                        if result:
+                            customer_id = result[0]
+                            conn.execute(
+                                text(
+                                    "UPDATE customers SET name=:name, anniversary=:anniversary, notes=:notes WHERE id=:id"
+                                ),
+                                {
+                                    "name": name,
+                                    "anniversary": anniversary,
+                                    "notes": notes,
+                                    "id": customer_id,
+                                },
+                            )
+                        else:
+                            ins_res = conn.execute(
+                                text(
+                                    "INSERT INTO customers (name, phone, anniversary, notes) VALUES (:name, :phone, :anniversary, :notes) RETURNING id"
+                                ),
+                                {
+                                    "name": name,
+                                    "phone": formatted_phone,
+                                    "anniversary": anniversary,
+                                    "notes": notes,
+                                },
+                            )
+                            customer_id = ins_res.fetchone()[0]
+
+                        pickup_datetime_str = f"{pickup_date} {pickup_time.strftime('%H:%M:%S')}"
+                        conn.execute(
+                            text("""
+                            INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime) 
+                            VALUES (:customer_id, :product_name, :product, :amount, :pickup_datetime)
+                        """),
+                            {
+                                "customer_id": customer_id,
+                                "product_name": product_name,
+                                "product": product_name,
+                                "amount": amount,
+                                "pickup_datetime": pickup_datetime_str,
+                            },
                         )
-                    else:
-                        c.execute(
-                            "INSERT INTO customers (name, phone, anniversary, notes) VALUES (?, ?, ?, ?)",
-                            (name, formatted_phone, anniversary, notes),
-                        )
-                        customer_id = c.lastrowid
 
-                    pickup_datetime_str = f"{pickup_date} {pickup_time.strftime('%H:%M:%S')}"
-                    c.execute(
-                        """
-                        INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime) 
-                        VALUES (?, ?, ?, ?, ?)
-                    """,
-                        (
-                            customer_id,
-                            product_name,
-                            product_name,
-                            amount,
-                            pickup_datetime_str,
-                        ),
-                    )
-
-                    conn.commit()
                     st.success(
-                        f"[{name}] ({formatted_phone}) 님의 주문이 성공적으로 저장되었습니다!"
+                        f"[{name}] ({formatted_phone}) 님의 주문이 영구 데이터베이스에 성공적으로 저장되었습니다!"
                     )
 
                 except Exception as e:
@@ -262,17 +285,20 @@ elif menu == "📅 픽업 일정 확인 (달력)":
     end_date = f"{year}-{month:02d}-{last_day} 23:59:59"
 
     try:
-        df_month = pd.read_sql_query(
-            f"""
+        query = text("""
             SELECT o.id, c.name as 고객명, c.phone as 연락처, 
                    COALESCE(NULLIF(o.product_name, ''), o.product, '') as 상품명, 
                    o.amount as 금액, o.pickup_datetime, o.status as 상태
             FROM orders o JOIN customers c ON o.customer_id = c.id
-            WHERE o.pickup_datetime BETWEEN '{start_date}' AND '{end_date}'
+            WHERE o.pickup_datetime BETWEEN :start_date AND :end_date
             ORDER BY o.pickup_datetime ASC
-        """,
-            conn,
-        )
+        """)
+        with engine.connect() as conn:
+            df_month = pd.read_sql_query(
+                query,
+                conn,
+                params={"start_date": start_date, "end_date": end_date},
+            )
     except Exception:
         df_month = pd.DataFrame()
 
@@ -344,7 +370,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdatescalendar(year, month)
 
-    # 동적 색상 스타일 지정을 위한 리스트
     pickup_button_keys = []
     selected_button_key = f"d_{st.session_state['selected_date']}"
 
@@ -368,10 +393,9 @@ elif menu == "📅 픽업 일정 확인 (달력)":
             else:
                 cols[i].write("")
 
-    # 🎨 key를 직접 지정하여 픽업 날짜(핑크색) 및 선택 날짜(파란색) 색상 강제 주입
+    # 🎨 픽업 날짜(핑크색) 및 선택 날짜(파란색) 동적 CSS 적용
     dynamic_css = "<style>\n"
 
-    # 1. 픽업 건수가 있는 날짜 -> 🩷 핑크색
     for p_key in pickup_button_keys:
         dynamic_css += f"""
         div[data-testid="stButton"] > button[key="{p_key}"],
@@ -384,7 +408,6 @@ elif menu == "📅 픽업 일정 확인 (달력)":
         }}
         """
 
-    # 2. 현재 선택된 날짜 -> 🟦 파란색 (선택된 날짜가 픽업 날짜이더라도 파란색으로 우선 강조)
     dynamic_css += f"""
     div[data-testid="stButton"] > button[key="{selected_button_key}"],
     button[aria-label*="{selected_button_key}"],
@@ -436,10 +459,13 @@ elif menu == "🎉 기념일 고객 관리":
 
     current_month_str = datetime.now(KST).strftime("%m")
     try:
-        df_customers = pd.read_sql_query(
-            "SELECT name as 고객명, phone as 연락처, anniversary as 기념일, notes as 메모 FROM customers",
-            conn,
-        )
+        with engine.connect() as conn:
+            df_customers = pd.read_sql_query(
+                text(
+                    "SELECT name as 고객명, phone as 연락처, anniversary as 기념일, notes as 메모 FROM customers"
+                ),
+                conn,
+            )
         anniversary_df = df_customers[
             df_customers["기념일"].str.contains(
                 f"^{current_month_str}|-{current_month_str}-", na=False
@@ -461,14 +487,20 @@ elif menu == "🔔 알림 발송 현황":
 
     st.markdown("##### 📌 24시간 이내 픽업 예정 (1일 전 알림 대상)")
     try:
-        df_1day = pd.read_sql_query(
-            f"""
+        query = text("""
             SELECT o.id, c.name as 고객명, c.phone as 연락처, o.pickup_datetime as 픽업일시
             FROM orders o JOIN customers c ON o.customer_id = c.id
-            WHERE o.notified_1day = 0 AND o.pickup_datetime BETWEEN '{now.strftime('%Y-%m-%d %H:%M:%S')}' AND '{tomorrow.strftime('%Y-%m-%d %H:%M:%S')}'
-        """,
-            conn,
-        )
+            WHERE o.notified_1day = 0 AND o.pickup_datetime BETWEEN :now_str AND :tomorrow_str
+        """)
+        with engine.connect() as conn:
+            df_1day = pd.read_sql_query(
+                query,
+                conn,
+                params={
+                    "now_str": now.strftime("%Y-%m-%d %H:%M:%S"),
+                    "tomorrow_str": tomorrow.strftime("%Y-%m-%d %H:%M:%S"),
+                },
+            )
         st.dataframe(df_1day, use_container_width=True)
     except Exception:
         st.write("현재 발송 대상 알림이 없습니다.")
