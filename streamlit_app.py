@@ -155,7 +155,7 @@ with st.sidebar:
     st.title("📌 메뉴")
     menu = st.radio("이동할 메뉴를 선택하세요", menu_options, key="sidebar_main_menu")
 
-# 달력 영역의 부분 리프레시를 위한 Fragment 함수
+# 달력 + 상호작용 리스트 영역 부분 리프레시 Fragment
 @st.fragment
 def render_calendar_section(df_orders):
     def get_pastel_color(pm):
@@ -195,7 +195,7 @@ def render_calendar_section(df_orders):
                 "timeZone": "Asia/Seoul",
                 "selectable": True
             }, 
-            key="calendar_kst_v13"
+            key="calendar_kst_v14"
         )
         
         if cal_res:
@@ -233,12 +233,29 @@ def render_calendar_section(df_orders):
             else:
                 day_orders['픽업시각'] = day_orders['pickup_datetime'].dt.strftime('%p %I:%M').replace({'AM': '오전', 'PM': '오후'}, regex=True)
                 
-                # 원클릭 선택 버튼을 적용한 직관적 목록
-                st.write("👇 수정할 주문을 클릭하세요:")
-                for _, d_row in day_orders.iterrows():
-                    btn_label = f"✏️ 주문 #{int(d_row['id'])} | {d_row['customer_name']}님 | {d_row['product_name']} ({d_row['amount']:,}원) | 픽업: {d_row['픽업시각']} [{d_row['payment_method']}]"
-                    if st.button(btn_label, key=f"btn_day_order_{int(d_row['id'])}", use_container_width=True):
-                        st.session_state["edit_order_id"] = int(d_row['id'])
+                # 깔끔한 테이블 보기용 DataFrame 구성
+                day_display = day_orders.rename(columns={
+                    'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
+                    'product_name': '상품명', 'amount': '금액', 'payment_method': '결제내역', 'memo': '메모'
+                })[['주문ID', '고객명', '연락처', '상품명', '금액', '픽업시각', '결제내역', '메모']]
+                
+                st.caption("💡 수정하려는 행 왼쪽의 **네모 선택상자** 또는 **행 내부**를 클릭하세요.")
+                
+                # 선택 박스가 선명하게 포함된 테이블
+                day_event = st.dataframe(
+                    day_display, 
+                    use_container_width=True, 
+                    selection_mode="single-row", 
+                    on_select="rerun", 
+                    hide_index=True,
+                    key=f"day_table_{sel_date_str}"
+                )
+                
+                if day_event and "selection" in day_event and day_event["selection"]["rows"]:
+                    selected_row_idx = day_event["selection"]["rows"][0]
+                    selected_order_id = int(day_display.iloc[selected_row_idx]['주문ID'])
+                    if st.session_state.get("edit_order_id") != selected_order_id:
+                        st.session_state["edit_order_id"] = selected_order_id
                         st.rerun()
 
     with tab2:
@@ -252,13 +269,13 @@ def render_calendar_section(df_orders):
                 'product_name': '상품명', 'amount': '금액', 'payment_method': '결제내역', 'memo': '메모'
             })[['주문ID', '고객명', '연락처', '상품명', '금액', '접수일시', '픽업일시', '결제내역', '메모']]
             
-            # 선택 체크박스가 보이도록 설정 (hide_index 제거)
             event = st.dataframe(
                 display_df, 
                 use_container_width=True, 
                 selection_mode="single-row", 
                 on_select="rerun", 
-                key="order_table_selection"
+                hide_index=True,
+                key="order_table_all_selection"
             )
             
             if event and "selection" in event and event["selection"]["rows"]:
