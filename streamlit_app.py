@@ -15,6 +15,16 @@ st.markdown("""
         font-family: 'Pretendard', sans-serif !important;
     }
     
+    /* 스트림릿 상단 헤더(깨진 텍스트가 발생하는 영역)를 통째로 숨김 처리 */
+    header {
+        display: none !important;
+    }
+    
+    /* 상단 여백 조정 */
+    .block-container {
+        padding-top: 2rem !important;
+    }
+    
     /* 제목 글씨 크기 및 행간 */
     .app-title {
         font-size: 1.56rem !important;
@@ -66,23 +76,6 @@ st.markdown("""
         padding-bottom: 0px !important;
     }
 </style>
-
-<!-- 자바스크립트로 사이드바 상단 깨지는 텍스트 원천 차단 -->
-<script>
-    const observer = new MutationObserver((mutations, obs) => {
-        const header = window.parent.document.querySelector('header');
-        if (header) {
-            const walker = document.createTreeWalker(header, NodeFilter.SHOW_TEXT, null, false);
-            let node;
-            while (node = walker.nextNode()) {
-                if (node.nodeValue.includes('keyboard_double')) {
-                    node.nodeValue = '';
-                }
-            }
-        }
-    });
-    observer.observe(window.parent.document, { childList: true, subtree: true });
-</script>
 """, unsafe_allow_html=True)
 
 with st.sidebar:
