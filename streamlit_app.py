@@ -149,8 +149,7 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
-            # --- 파스텔 톤 상태별 칼라 맵핑 ---
-            # 접수: 연보라(#B39DDB), 제작중: 파스텔핑크(#F48FB1), 배송중/완료: 파스텔민트(#80CBC4), 취소: 차분한 회갈색(#BCAAA4)
+            # 파스텔 톤 상태별 칼라 맵핑
             def get_pastel_color(status):
                 if status == '접수':
                     return "#9FA8DA"  # 라벤더 블루
@@ -163,158 +162,180 @@ if engine:
                 else:
                     return "#B0BEC5"  # Soft 세이지 그레이
 
-            # --- 1. 📅 픽업/배송 달력 (상단 배치) ---
-            st.subheader("📅 픽업 / 배송 달력")
-            st.caption("💡 달력에서 날짜를 클릭하면 아래 표에 해당 날짜의 주문이 자동으로 정렬됩니다.")
-            
-            calendar_events = []
-            for _, row in df_orders.iterrows():
-                if pd.notnull(row['pickup_datetime']):
-                    p_dt = pd.to_datetime(row['pickup_datetime'])
-                    color = get_pastel_color(row['status'])
-                    calendar_events.append({
-                        "title": f"[{row['status']}] {row['customer_name']} - {row['product_name']}",
-                        "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
-                        "backgroundColor": color,
-                        "borderColor": color,
-                        "textColor": "#2C3E50"  # 글씨는 잘 보이도록 다크그레이
-                    })
-            
-            calendar_options = {
-                "headerToolbar": {
-                    "left": "prev,next today",
-                    "center": "title",
-                    "right": ""  # month, week, day 버튼 제거 요청 반영
-                },
-                "initialView": "dayGridMonth",
-                "height": 620,
-                "selectable": True
-            }
-            
-            # 달력 클릭 이벤트 받기
-            cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_pastel")
-            
-            clicked_date_str = None
-            if cal_res and cal_res.get("dateClick"):
-                clicked_date_str = cal_res["dateClick"]["date"].split("T")[0]
-            
-            st.markdown("---")
-            
-            # --- 2. 📊 주문 목록 (표 형태) ---
-            if clicked_date_str:
-                st.subheader(f"📊 {clicked_date_str} 픽업 주문 목록")
-                if st.button("🔄 전체 주문 목록 다시 보기"):
-                    clicked_date_str = None
-                    st.rerun()
-            else:
-                st.subheader("📊 전체 주문 목록 (행 클릭시 하단폼 자동 입력)")
-            
-            # 날짜 클릭시 필터링 적용
-            filtered_df = df_orders.copy()
-            if clicked_date_str:
-                filtered_df['pickup_date_only'] = pd.to_datetime(filtered_df['pickup_datetime']).dt.strftime('%Y-%m-%d')
-                filtered_df = filtered_df[filtered_df['pickup_date_only'] == clicked_date_str]
-            
-            display_df = filtered_df.rename(columns={
-                'id': '주문ID',
-                'customer_name': '고객명',
-                'phone': '연락처',
-                'product_name': '상품명',
-                'amount': '금액',
-                'created_at': '접수일시',
-                'pickup_datetime': '픽업일시',
-                'status': '상태'
-            }).drop(columns=['customer_id', 'pickup_date_only'], errors='ignore')
-            
-            event = st.dataframe(
-                display_df, 
-                use_container_width=True,
-                selection_mode="single-row",
-                on_select="rerun"
-            )
-            
-            selected_id = None
-            if event and event.get("selection") and event["selection"].get("rows"):
-                selected_row_index = event["selection"]["rows"][0]
-                if selected_row_index < len(filtered_df):
-                    selected_id = filtered_df.iloc[selected_row_index]['id']
+            # 메뉴 내부 탭 분리: [1] 📅 픽업 달력  [2] 📊 전체 주문 목록
+            tab1, tab2 = st.tabs(["📅 픽업 달력", "📊 전체 주문 목록"])
 
-            # --- 3. ✏️ 주문 수정 및 삭제 ---
-            if not df_orders.empty:
+            # --- [TAB 1] 픽업 달력 ---
+            with tab1:
+                st.caption("💡 달력에서 날짜를 클릭하면 아래에 해당 날짜의 픽업 주문만 정렬되어 나타납니다.")
+                
+                calendar_events = []
+                for _, row in df_orders.iterrows():
+                    if pd.notnull(row['pickup_datetime']):
+                        p_dt = pd.to_datetime(row['pickup_datetime'])
+                        color = get_pastel_color(row['status'])
+                        calendar_events.append({
+                            "title": f"[{row['status']}] {row['customer_name']} - {row['product_name']}",
+                            "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "backgroundColor": color,
+                            "borderColor": color,
+                            "textColor": "#2C3E50"
+                        })
+                
+                calendar_options = {
+                    "headerToolbar": {
+                        "left": "prev,next today",
+                        "center": "title",
+                        "right": "" # month/week/day 삭제
+                    },
+                    "initialView": "dayGridMonth",
+                    "height": 620,
+                    "selectable": True
+                }
+                
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v2")
+                
+                clicked_date_str = None
+                if cal_res and cal_res.get("dateClick"):
+                    raw_date_str = cal_res["dateClick"]["date"]
+                    # ISO 날짜 파싱 후 한국 시간(KST) 기준으로 보정
+                    if "T" in raw_date_str:
+                        dt_obj = pd.to_datetime(raw_date_str).tz_convert("Asia/Seoul")
+                    else:
+                        dt_obj = pd.to_datetime(raw_date_str)
+                    clicked_date_str = dt_obj.strftime("%Y-%m-%d")
+
                 st.markdown("---")
-                st.subheader("✏️ 주문 수정 및 삭제")
                 
-                order_ids = df_orders['id'].tolist()
-                default_index = order_ids.index(selected_id) if (selected_id is not None and selected_id in order_ids) else 0
-                chosen_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", order_ids, index=default_index)
-                
-                selected_row = df_orders[df_orders['id'] == chosen_id].iloc[0]
-                
-                now_kst = get_kst_now()
-                curr_cat = pd.to_datetime(selected_row['created_at']) if pd.notnull(selected_row['created_at']) else now_kst
-                curr_pdt = pd.to_datetime(selected_row['pickup_datetime']) if pd.notnull(selected_row['pickup_datetime']) else now_kst
-                
-                with st.form("edit_order_form"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        edit_name = st.text_input("고객명", value=str(selected_row['customer_name'] or ""))
-                        edit_phone = st.text_input("연락처", value=str(selected_row['phone'] or ""))
-                        edit_product = st.text_input("상품명", value=str(selected_row['product_name'] or ""))
-                        edit_amount = st.number_input("금액 (원)", min_value=0, step=1000, value=int(selected_row['amount'] or 0))
-                    with col2:
-                        sub_col1, sub_col2 = st.columns(2)
-                        with sub_col1:
-                            edit_order_date = st.date_input("접수 날짜", value=curr_cat.date())
-                        with sub_col2:
-                            edit_order_time = st.time_input("접수 시간", value=curr_cat.time())
-                            
-                        sub_col3, sub_col4 = st.columns(2)
-                        with sub_col3:
-                            edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date())
-                        with sub_col4:
-                            edit_pickup_time = st.time_input("픽업 시간", value=curr_pdt.time())
+                if clicked_date_str:
+                    st.subheader(f"📌 {clicked_date_str} 픽업 주문 리스트")
+                    
+                    df_orders_temp = df_orders.copy()
+                    df_orders_temp['pickup_date_only'] = pd.to_datetime(df_orders_temp['pickup_datetime']).dt.strftime('%Y-%m-%d')
+                    day_orders = df_orders_temp[df_orders_temp['pickup_date_only'] == clicked_date_str]
+                    
+                    if not day_orders.empty:
+                        disp_day_df = day_orders.rename(columns={
+                            'id': '주문ID',
+                            'customer_name': '고객명',
+                            'phone': '연락처',
+                            'product_name': '상품명',
+                            'amount': '금액',
+                            'created_at': '접수일시',
+                            'pickup_datetime': '픽업일시',
+                            'status': '상태'
+                        }).drop(columns=['customer_id', 'pickup_date_only'], errors='ignore')
                         
-                        status_list = ["접수", "제작중", "배송중", "완료", "취소"]
-                        curr_status = selected_row['status']
-                        curr_status_idx = status_list.index(curr_status) if curr_status in status_list else 0
-                        edit_status = st.selectbox("상태", status_list, index=curr_status_idx)
+                        st.dataframe(disp_day_df, use_container_width=True)
+                    else:
+                        st.info(f"{clicked_date_str}에는 예정된 픽업 주문이 없습니다.")
+                else:
+                    st.info("👆 달력에서 특정 날짜를 클릭하시면 해당 날짜의 픽업 주문 리스트가 여기에 표시됩니다.")
+
+            # --- [TAB 2] 전체 주문 목록 및 수정/삭제 ---
+            with tab2:
+                st.subheader("📊 전체 주문 목록")
+                
+                display_df = df_orders.rename(columns={
+                    'id': '주문ID',
+                    'customer_name': '고객명',
+                    'phone': '연락처',
+                    'product_name': '상품명',
+                    'amount': '금액',
+                    'created_at': '접수일시',
+                    'pickup_datetime': '픽업일시',
+                    'status': '상태'
+                }).drop(columns=['customer_id'], errors='ignore')
+                
+                event = st.dataframe(
+                    display_df, 
+                    use_container_width=True,
+                    selection_mode="single-row",
+                    on_select="rerun"
+                )
+                
+                selected_id = None
+                if event and event.get("selection") and event["selection"].get("rows"):
+                    selected_row_index = event["selection"]["rows"][0]
+                    if selected_row_index < len(df_orders):
+                        selected_id = df_orders.iloc[selected_row_index]['id']
+
+                # 주문 수정 및 삭제 폼
+                if not df_orders.empty:
+                    st.markdown("---")
+                    st.subheader("✏️ 주문 수정 및 삭제")
                     
-                    btn_col1, btn_col2 = st.columns(2)
-                    with btn_col1:
-                        update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
-                    with btn_col2:
-                        delete_btn = st.form_submit_button("🗑️ 주문 삭제", use_container_width=True)
+                    order_ids = df_orders['id'].tolist()
+                    default_index = order_ids.index(selected_id) if (selected_id is not None and selected_id in order_ids) else 0
+                    chosen_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", order_ids, index=default_index)
                     
-                    if update_btn:
-                        try:
-                            edit_cat = datetime.combine(edit_order_date, edit_order_time)
-                            edit_pdt = datetime.combine(edit_pickup_date, edit_pickup_time)
-                            cid = selected_row['customer_id']
-                            
-                            with engine.connect() as conn:
-                                if pd.notnull(cid):
-                                    conn.execute(text("UPDATE customers SET name=:n, phone=:p WHERE id=:id"), {"n": edit_name, "p": edit_phone, "id": cid})
+                    selected_row = df_orders[df_orders['id'] == chosen_id].iloc[0]
+                    
+                    now_kst = get_kst_now()
+                    curr_cat = pd.to_datetime(selected_row['created_at']) if pd.notnull(selected_row['created_at']) else now_kst
+                    curr_pdt = pd.to_datetime(selected_row['pickup_datetime']) if pd.notnull(selected_row['pickup_datetime']) else now_kst
+                    
+                    with st.form("edit_order_form"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            edit_name = st.text_input("고객명", value=str(selected_row['customer_name'] or ""))
+                            edit_phone = st.text_input("연락처", value=str(selected_row['phone'] or ""))
+                            edit_product = st.text_input("상품명", value=str(selected_row['product_name'] or ""))
+                            edit_amount = st.number_input("금액 (원)", min_value=0, step=1000, value=int(selected_row['amount'] or 0))
+                        with col2:
+                            sub_col1, sub_col2 = st.columns(2)
+                            with sub_col1:
+                                edit_order_date = st.date_input("접수 날짜", value=curr_cat.date())
+                            with sub_col2:
+                                edit_order_time = st.time_input("접수 시간", value=curr_cat.time())
                                 
-                                conn.execute(text("""
-                                    UPDATE orders 
-                                    SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, created_at=:cat
-                                    WHERE id=:id
-                                """), {"pn": edit_product, "am": edit_amount, "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": chosen_id})
-                                conn.commit()
-                            st.success(f"{chosen_id}번 주문이 성공적으로 수정되었습니다!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"수정 실패: {e}")
+                            sub_col3, sub_col4 = st.columns(2)
+                            with sub_col3:
+                                edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date())
+                            with sub_col4:
+                                edit_pickup_time = st.time_input("픽업 시간", value=curr_pdt.time())
+                            
+                            status_list = ["접수", "제작중", "배송중", "완료", "취소"]
+                            curr_status = selected_row['status']
+                            curr_status_idx = status_list.index(curr_status) if curr_status in status_list else 0
+                            edit_status = st.selectbox("상태", status_list, index=curr_status_idx)
                         
-                    if delete_btn:
-                        try:
-                            with engine.connect() as conn:
-                                conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": chosen_id})
-                                conn.commit()
-                            st.warning(f"{chosen_id}번 주문이 삭제되었습니다.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"삭제 실패: {e}")
+                        btn_col1, btn_col2 = st.columns(2)
+                        with btn_col1:
+                            update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
+                        with btn_col2:
+                            delete_btn = st.form_submit_button("🗑️ 주문 삭제", use_container_width=True)
+                        
+                        if update_btn:
+                            try:
+                                edit_cat = datetime.combine(edit_order_date, edit_order_time)
+                                edit_pdt = datetime.combine(edit_pickup_date, edit_pickup_time)
+                                cid = selected_row['customer_id']
+                                
+                                with engine.connect() as conn:
+                                    if pd.notnull(cid):
+                                        conn.execute(text("UPDATE customers SET name=:n, phone=:p WHERE id=:id"), {"n": edit_name, "p": edit_phone, "id": cid})
+                                    
+                                    conn.execute(text("""
+                                        UPDATE orders 
+                                        SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, created_at=:cat
+                                        WHERE id=:id
+                                    """), {"pn": edit_product, "am": edit_amount, "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": chosen_id})
+                                    conn.commit()
+                                st.success(f"{chosen_id}번 주문이 성공적으로 수정되었습니다!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"수정 실패: {e}")
+                            
+                        if delete_btn:
+                            try:
+                                with engine.connect() as conn:
+                                    conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": chosen_id})
+                                    conn.commit()
+                                st.warning(f"{chosen_id}번 주문이 삭제되었습니다.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"삭제 실패: {e}")
         except Exception as e:
             st.error(f"주문 목록을 가져오는 중 오류가 발생했습니다: {e}")
 
