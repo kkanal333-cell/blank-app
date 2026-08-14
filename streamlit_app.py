@@ -251,104 +251,103 @@ if engine:
             if "edit_order_id" not in st.session_state:
                 st.session_state["edit_order_id"] = None
 
-            # 부분 새로고침을 위한 프래그먼트 컴포넌트 정의
-            @st.fragment
-            def render_order_section():
-                tab1, tab2 = st.tabs(["📅 픽업 달력", "📊 전체 주문 목록"])
+            tab1, tab2 = st.tabs(["📅 픽업 달력", "📊 전체 주문 목록"])
 
-                with tab1:
-                    calendar_events = []
-                    for _, row in df_orders.iterrows():
-                        if pd.notnull(row['pickup_datetime']):
-                            p_dt = pd.to_datetime(row['pickup_datetime'])
-                            pm = row['payment_method'] or "입금"
-                            color = get_pastel_color(pm)
-                            calendar_events.append({
-                                "id": str(int(row['id'])),
-                                "title": f"[{pm}] {row['customer_name']} - {row['product_name']}",
-                                "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
-                                "backgroundColor": color, "borderColor": color, "textColor": "#2D3748"
-                            })
-                    
-                    cal_res = calendar(
-                        events=calendar_events, 
-                        options={
-                            "headerToolbar": {"left": "prev,next today", "center": "title", "right": ""}, 
-                            "initialView": "dayGridMonth", 
-                            "height": 500,
-                            "selectable": True
-                        }, 
-                        key="calendar_v6"
-                    )
-                    
-                    if cal_res:
-                        if cal_res.get("dateClick"):
-                            clicked_date = cal_res["dateClick"]["date"][:10]
+            with tab1:
+                calendar_events = []
+                for _, row in df_orders.iterrows():
+                    if pd.notnull(row['pickup_datetime']):
+                        p_dt = pd.to_datetime(row['pickup_datetime'])
+                        pm = row['payment_method'] or "입금"
+                        color = get_pastel_color(pm)
+                        calendar_events.append({
+                            "id": str(int(row['id'])),
+                            "title": f"[{pm}] {row['customer_name']} - {row['product_name']}",
+                            "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "backgroundColor": color, "borderColor": color, "textColor": "#2D3748"
+                        })
+                
+                cal_res = calendar(
+                    events=calendar_events, 
+                    options={
+                        "headerToolbar": {"left": "prev,next today", "center": "title", "right": ""}, 
+                        "initialView": "dayGridMonth", 
+                        "height": 520,
+                        "selectable": True
+                    }, 
+                    key="calendar_stable_v7"
+                )
+                
+                if cal_res:
+                    if cal_res.get("dateClick"):
+                        clicked_date = cal_res["dateClick"]["date"][:10]
+                        if st.session_state.get("selected_calendar_date") != clicked_date:
                             st.session_state["selected_calendar_date"] = clicked_date
-                        elif cal_res.get("eventClick"):
-                            evt = cal_res["eventClick"]["event"]
-                            clicked_event_id = int(evt["id"])
+                    elif cal_res.get("eventClick"):
+                        evt = cal_res["eventClick"]["event"]
+                        clicked_event_id = int(evt["id"])
+                        if st.session_state.get("edit_order_id") != clicked_event_id:
                             st.session_state["edit_order_id"] = clicked_event_id
                             matched_row = df_orders[df_orders['id'] == clicked_event_id]
                             if not matched_row.empty:
                                 p_dt_val = pd.to_datetime(matched_row.iloc[0]['pickup_datetime'])
                                 st.session_state["selected_calendar_date"] = p_dt_val.strftime("%Y-%m-%d")
 
-                    if st.session_state.get("selected_calendar_date"):
-                        sel_date_str = st.session_state["selected_calendar_date"]
-                        st.markdown(f"---")
-                        st.subheader(f"📅 {sel_date_str} 픽업 주문 목록")
-                        
-                        df_orders['p_date_str'] = pd.to_datetime(df_orders['pickup_datetime']).dt.strftime('%Y-%m-%d')
-                        day_orders = df_orders[df_orders['p_date_str'] == sel_date_str]
-                        
-                        if day_orders.empty:
-                            st.info("해당 날짜에 픽업 예정인 주문이 없습니다.")
-                        else:
-                            day_display_df = day_orders.rename(columns={
-                                'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
-                                'product_name': '상품명', 'amount': '금액', 'created_at': '접수일시',
-                                'pickup_datetime': '픽업일시', 'payment_method': '결제내역', 'memo': '메모'
-                            }).drop(columns=['customer_id', 'p_date_str'], errors='ignore')
-                            
-                            # 체크박스 열을 숨기고 클릭만으로 선택 가능하게 변경
-                            day_event = st.dataframe(
-                                day_display_df, 
-                                use_container_width=True, 
-                                selection_mode="single-row", 
-                                on_select="rerun", 
-                                key="day_order_table",
-                                hide_index=True
-                            )
-                            
-                            if day_event and "selection" in day_event and day_event["selection"]["rows"]:
-                                selected_row_idx = day_event["selection"]["rows"][0]
-                                selected_order_id = int(day_display_df.iloc[selected_row_idx]['주문ID'])
-                                st.session_state["edit_order_id"] = selected_order_id
-
-                with tab2:
-                    display_df = df_orders.rename(columns={
-                        'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
-                        'product_name': '상품명', 'amount': '금액', 'created_at': '접수일시',
-                        'pickup_datetime': '픽업일시', 'payment_method': '결제내역', 'memo': '메모'
-                    }).drop(columns=['customer_id'], errors='ignore')
+                if st.session_state.get("selected_calendar_date"):
+                    sel_date_str = st.session_state["selected_calendar_date"]
+                    st.markdown("---")
+                    st.subheader(f"📅 {sel_date_str} 픽업 주문 목록")
                     
-                    # 체크박스 열을 숨기고 클릭만으로 선택 가능하게 변경
-                    event = st.dataframe(
-                        display_df, 
-                        use_container_width=True, 
-                        selection_mode="single-row", 
-                        on_select="rerun", 
-                        key="order_table_selection",
-                        hide_index=True
-                    )
+                    df_orders['p_date_str'] = pd.to_datetime(df_orders['pickup_datetime']).dt.strftime('%Y-%m-%d')
+                    day_orders = df_orders[df_orders['p_date_str'] == sel_date_str]
                     
-                    if event and "selection" in event and event["selection"]["rows"]:
-                        selected_row_idx = event["selection"]["rows"][0]
-                        selected_order_id = int(display_df.iloc[selected_row_idx]['주문ID'])
-                        st.session_state["edit_order_id"] = selected_order_id
+                    if day_orders.empty:
+                        st.info("해당 날짜에 픽업 예정인 주문이 없습니다.")
+                    else:
+                        day_display_df = day_orders.rename(columns={
+                            'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
+                            'product_name': '상품명', 'amount': '금액', 'created_at': '접수일시',
+                            'pickup_datetime': '픽업일시', 'payment_method': '결제내역', 'memo': '메모'
+                        }).drop(columns=['customer_id', 'p_date_str'], errors='ignore')
+                        
+                        day_event = st.dataframe(
+                            day_display_df, 
+                            use_container_width=True, 
+                            selection_mode="single-row", 
+                            on_select="rerun", 
+                            key="day_order_table",
+                            hide_index=True
+                        )
+                        
+                        if day_event and "selection" in day_event and day_event["selection"]["rows"]:
+                            selected_row_idx = day_event["selection"]["rows"][0]
+                            selected_order_id = int(day_display_df.iloc[selected_row_idx]['주문ID'])
+                            st.session_state["edit_order_id"] = selected_order_id
 
-                # 선택한 항목의 수정 폼 구역
+            with tab2:
+                display_df = df_orders.rename(columns={
+                    'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
+                    'product_name': '상품명', 'amount': '금액', 'created_at': '접수일시',
+                    'pickup_datetime': '픽업일시', 'payment_method': '결제내역', 'memo': '메모'
+                }).drop(columns=['customer_id'], errors='ignore')
+                
+                event = st.dataframe(
+                    display_df, 
+                    use_container_width=True, 
+                    selection_mode="single-row", 
+                    on_select="rerun", 
+                    key="order_table_selection",
+                    hide_index=True
+                )
+                
+                if event and "selection" in event and event["selection"]["rows"]:
+                    selected_row_idx = event["selection"]["rows"][0]
+                    selected_order_id = int(display_df.iloc[selected_row_idx]['주문ID'])
+                    st.session_state["edit_order_id"] = selected_order_id
+
+            # 독립적인 하단 수정 폼 렌더링 프래그먼트
+            @st.fragment
+            def render_edit_form():
                 if st.session_state.get("edit_order_id") is not None:
                     selected_id = st.session_state["edit_order_id"]
                     matched_rows = df_orders[df_orders['id'] == selected_id]
@@ -466,8 +465,7 @@ if engine:
                                     except Exception as e:
                                         st.error(f"수정 실패: {e}")
 
-            # 부분 새로고침 프래그먼트 호출
-            render_order_section()
+            render_edit_form()
 
         except Exception as e:
             st.error(f"목록 조회 오류: {e}")
