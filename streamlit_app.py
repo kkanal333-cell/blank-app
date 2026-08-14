@@ -15,23 +15,28 @@ st.markdown("""
         font-family: 'Pretendard', sans-serif !important;
     }
     
-    /* 사이드바 토글 버튼의 깨진 텍스트 완벽 차단 (투명화 및 크기 제거) */
-    [data-testid="collapsedControl"], button[kind="header"] {
-        color: transparent !important;
+    /* 사이드바 토글 버튼의 깨진 텍스트를 감추고 깔끔한 화살표 아이콘으로 대체 */
+    [data-testid="collapsedControl"] {
+        background-color: transparent !important;
+    }
+    [data-testid="collapsedControl"] *:not(svg) {
         font-size: 0px !important;
-        pointer-events: auto !important;
+        color: transparent !important;
+        display: none !important;
     }
     [data-testid="collapsedControl"] svg {
-        display: block !important;
+        width: 22px !important;
+        height: 22px !important;
         fill: #582C83 !important;
+        display: block !important;
     }
     
-    /* 제목 글씨 크기 및 행간 정상 위치 복원 */
+    /* 제목 글씨 크기 및 위치 정돈 */
     .app-title {
         font-size: 1.56rem !important;
         color: #582C83 !important;
         font-weight: 700 !important;
-        margin-top: 0.5rem !important;
+        margin-top: 0.2rem !important;
         margin-bottom: 0.6rem !important;
         line-height: 1.4 !important;
     }
