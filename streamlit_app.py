@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, text
 # 브라우저 탭 타이틀
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리 시스템", layout="wide", page_icon="💐")
 
-# 대한민국 한국 표준시(KST) 설정 함수
+# 대한민국 한국 표준시(KST) 설정
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
@@ -30,7 +30,6 @@ def get_connection():
 
 engine = get_connection()
 
-# 상호명 반영 메인 타이틀
 st.title("💐 화사한 하루 고객 & 주문 관리 시스템")
 
 st.sidebar.title("📌 메뉴 목록")
@@ -50,7 +49,6 @@ if engine:
     if menu == "📝 신규 주문 및 고객 등록":
         st.header("📝 신규 주문 및 고객 등록")
         
-        # 한국 표준시 기준 현재 시각
         now_kst = get_kst_now()
         
         with st.form("order_form", clear_on_submit=True):
@@ -62,14 +60,12 @@ if engine:
                 amount = st.number_input("결제 금액 (원)", min_value=0, step=1000, value=50000)
                 
             with col2:
-                # 📅 접수 날짜/시간 (한국 시각 기본 적용)
                 sub_col1, sub_col2 = st.columns(2)
                 with sub_col1:
                     order_date = st.date_input("접수 날짜", now_kst.date())
                 with sub_col2:
                     order_time = st.time_input("접수 시간", now_kst.time())
                 
-                # 🚚 픽업/배송 날짜/시간
                 sub_col3, sub_col4 = st.columns(2)
                 with sub_col3:
                     pickup_date = st.date_input("픽업 날짜", now_kst.date())
@@ -145,16 +141,32 @@ if engine:
                 'status': '상태'
             }).drop(columns=['customer_id'], errors='ignore')
             
-            st.dataframe(display_df, use_container_width=True)
+            # 💡 행 클릭 시 세션 상태 연동 설정
+            st.info("💡 아래 주문 목록에서 **행을 클릭**하면 하단 수정창에 해당 주문이 바로 채워집니다.")
+            event = st.dataframe(
+                display_df, 
+                use_container_width=True,
+                selection_mode="single-row",
+                on_select="rerun"
+            )
             
+            # 클릭한 행의 index 구하기
+            selected_id = None
+            if event and event.get("selection") and event["selection"].get("rows"):
+                selected_row_index = event["selection"]["rows"][0]
+                selected_id = df_orders.iloc[selected_row_index]['id']
+
             if not df_orders.empty:
                 st.markdown("---")
                 st.subheader("✏️ 주문 수정 및 삭제")
                 
                 order_ids = df_orders['id'].tolist()
-                selected_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", order_ids)
                 
-                selected_row = df_orders[df_orders['id'] == selected_id].iloc[0]
+                # 클릭 선택이 있으면 해당 ID, 없으면 첫 번째 ID 사용
+                default_index = order_ids.index(selected_id) if selected_id in order_ids else 0
+                chosen_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", order_ids, index=default_index)
+                
+                selected_row = df_orders[df_orders['id'] == chosen_id].iloc[0]
                 
                 now_kst = get_kst_now()
                 curr_cat = pd.to_datetime(selected_row['created_at']) if pd.notnull(selected_row['created_at']) else now_kst
@@ -205,9 +217,9 @@ if engine:
                                     UPDATE orders 
                                     SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, created_at=:cat
                                     WHERE id=:id
-                                """), {"pn": edit_product, "am": edit_amount, "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": selected_id})
+                                """), {"pn": edit_product, "am": edit_amount, "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": chosen_id})
                                 conn.commit()
-                            st.success(f"{selected_id}번 주문이 성공적으로 수정되었습니다!")
+                            st.success(f"{chosen_id}번 주문이 성공적으로 수정되었습니다!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"수정 실패: {e}")
@@ -215,9 +227,9 @@ if engine:
                     if delete_btn:
                         try:
                             with engine.connect() as conn:
-                                conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": selected_id})
+                                conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": chosen_id})
                                 conn.commit()
-                            st.warning(f"{selected_id}번 주문이 삭제되었습니다.")
+                            st.warning(f"{chosen_id}번 주문이 삭제되었습니다.")
                             st.rerun()
                         except Exception as e:
                             st.error(f"삭제 실패: {e}")
@@ -233,17 +245,18 @@ if engine:
                 name = st.text_input("고객명 *")
                 phone = st.text_input("연락처")
             with col2:
-                memo = st.text_area("선호하는 꽃 / 메모")
+                st.info("💡 추가 고객 정보 관리 항목 준비 중입니다.")
             submit = st.form_submit_button("고객 등록", use_container_width=True)
             if submit and name:
                 with engine.connect() as conn:
-                    conn.execute(text("INSERT INTO customers (name, phone, memo) VALUES (:n, :p, :m)"), {"n": name, "p": phone, "m": memo})
+                    conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p)"), {"n": name, "p": phone})
                     conn.commit()
                 st.success(f"'{name}' 고객님이 등록되었습니다!")
                 st.rerun()
                 
         try:
-            df_customers = pd.read_sql("SELECT id as ID, name as 고객명, phone as 연락처, memo as 메모 FROM customers ORDER BY id DESC", engine)
+            # DB에 없는 memo 컬럼 제거하여 에러 수정
+            df_customers = pd.read_sql("SELECT id as ID, name as 고객명, phone as 연락처 FROM customers ORDER BY id DESC", engine)
             st.dataframe(df_customers, use_container_width=True)
         except Exception as e:
             st.error(f"고객 목록 조회 실패: {e}")
