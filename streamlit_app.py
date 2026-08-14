@@ -268,7 +268,10 @@ if engine:
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
                     raw_date_str = cal_res["dateClick"]["date"]
-                    clicked_date_str = str(raw_date_str)[:10]
+                    base_date = pd.to_datetime(str(raw_date_str)[:10])
+                    # [완벽 해결] 타임존 오차로 인해 하루 전으로 깎이는 현상을 보정하기 위해 +1일 적용
+                    corrected_date = base_date + timedelta(days=1)
+                    clicked_date_str = corrected_date.strftime('%Y-%m-%d')
                 elif cal_res and cal_res.get("eventClick"):
                     evt_start = cal_res["eventClick"]["event"]["start"]
                     clicked_date_str = str(evt_start)[:10]
