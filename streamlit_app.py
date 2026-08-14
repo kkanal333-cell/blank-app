@@ -15,15 +15,6 @@ st.markdown("""
         font-family: 'Pretendard', sans-serif !important;
     }
     
-    /* 사이드바 상단 깨지는 텍스트(keyboard_double_arrow) 완벽 숨김 처리 */
-    button[kind="header"], [data-testid="collapsedControl"] {
-        font-size: 0px !important;
-        color: transparent !important;
-    }
-    button[kind="header"]::before, [data-testid="collapsedControl"]::before {
-        content: "" !important;
-    }
-    
     /* 제목 글씨 크기 및 행간 */
     .app-title {
         font-size: 1.56rem !important;
@@ -68,7 +59,6 @@ st.markdown("""
         min-width: 0 !important;
     }
     
-    /* 입력창 및 셀렉트박스 높이/정렬 맞춤 */
     .stTextInput input, .stSelectbox select, .stNumberInput input, .stDateInput input, .stTimeInput input {
         min-height: 38px !important;
         height: 38px !important;
@@ -76,6 +66,23 @@ st.markdown("""
         padding-bottom: 0px !important;
     }
 </style>
+
+<!-- 자바스크립트로 사이드바 상단 깨지는 텍스트 원천 차단 -->
+<script>
+    const observer = new MutationObserver((mutations, obs) => {
+        const header = window.parent.document.querySelector('header');
+        if (header) {
+            const walker = document.createTreeWalker(header, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.nodeValue.includes('keyboard_double')) {
+                    node.nodeValue = '';
+                }
+            }
+        }
+    });
+    observer.observe(window.parent.document, { childList: true, subtree: true });
+</script>
 """, unsafe_allow_html=True)
 
 with st.sidebar:
