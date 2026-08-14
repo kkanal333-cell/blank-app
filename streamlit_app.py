@@ -23,36 +23,29 @@ def get_connection():
 
 engine = get_connection()
 
-# DB 테이블 호환성 확인 및 기본 생성
-if engine:
+# DB 컬럼 동적 조회 함수 (customer_name vs name 호환)
+def get_orders_df(engine):
     with engine.connect() as conn:
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS customers (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100),
-                phone VARCHAR(50),
-                memo TEXT
-            );
-        """))
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS orders (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100),
-                phone VARCHAR(50),
-                product_name VARCHAR(100),
-                price INT,
-                order_date DATE,
-                delivery_date DATE,
-                status VARCHAR(50),
-                memo TEXT
-            );
-        """))
-        conn.commit()
+        result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='orders'"))
+        cols = [row[0] for row in result.fetchall()]
+    
+    name_col = "customer_name" if "customer_name" in cols else "name"
+    query = f"SELECT id, {name_col} as 고객명, phone as 연락처, product_name as 상품명, price as 금액, order_date as 주문일, delivery_date as 배송일, status as 상태, memo as 메모 FROM orders ORDER BY id DESC"
+    return pd.read_sql(query, engine), name_col
 
 st.title("💐 꽃집 고객 & 주문 관리 시스템")
 
 st.sidebar.title("📌 메뉴 목록")
-menu = st.sidebar.radio("메뉴 선택", ["📝 신규 주문 및 고객 등록", "📋 주문 내역 관리 (수정/삭제)", "🎂 고객 관리", "📥 데이터 CSV 백업"])
+menu = st.sidebar.radio(
+    "메뉴 선택", 
+    [
+        "📝 신규 주문 및 고객 등록", 
+        "📋 주문 내역 관리 (수정/삭제)", 
+        "🎂 고객 관리", 
+        "🔔 알림 발송 현황", 
+        "📥 데이터 CSV 백업"
+    ]
+)
 
 if engine:
     # 1. 신규 주문 및 고객 등록
@@ -76,20 +69,24 @@ if engine:
                 if not customer_name or not product_name:
                     st.warning("고객 이름과 주문 상품명은 필수 입력 항목입니다.")
                 else:
-                    with engine.connect() as conn:
-                        conn.execute(text("""
-                            INSERT INTO orders (name, phone, product_name, price, order_date, delivery_date, status, memo)
-                            VALUES (:c, :p, :pr, :prc, :od, :dd, :st, :m)
-                        """), {"c": customer_name, "p": phone, "pr": product_name, "prc": price, "od": order_date, "dd": delivery_date, "st": status, "m": memo})
-                        conn.commit()
-                    st.success(f"'{customer_name}'님의 주문이 성공적으로 저장되었습니다!")
+                    try:
+                        _, name_col = get_orders_df(engine)
+                        with engine.connect() as conn:
+                            conn.execute(text(f"""
+                                INSERT INTO orders ({name_col}, phone, product_name, price, order_date, delivery_date, status, memo)
+                                VALUES (:c, :p, :pr, :prc, :od, :dd, :st, :m)
+                            """), {"c": customer_name, "p": phone, "pr": product_name, "prc": price, "od": order_date, "dd": delivery_date, "st": status, "m": memo})
+                            conn.commit()
+                        st.success(f"'{customer_name}'님의 주문이 성공적으로 저장되었습니다!")
+                    except Exception as e:
+                        st.error(f"저장 실패: {e}")
 
     # 2. 주문 내역 관리 (수정/삭제)
     elif menu == "📋 주문 내역 관리 (수정/삭제)":
         st.header("📋 전체 주문 내역 및 수정/삭제")
         
         try:
-            df_orders = pd.read_sql("SELECT id, name as 고객명, phone as 연락처, product_name as 상품명, price as 금액, order_date as 주문일, delivery_date as 배송일, status as 상태, memo as 메모 FROM orders ORDER BY id DESC", engine)
+            df_orders, name_col = get_orders_df(engine)
             st.dataframe(df_orders, use_container_width=True)
             
             if not df_orders.empty:
@@ -126,9 +123,9 @@ if engine:
                     
                     if update_btn:
                         with engine.connect() as conn:
-                            conn.execute(text("""
+                            conn.execute(text(f"""
                                 UPDATE orders 
-                                SET name=:c, phone=:p, product_name=:pr, price=:prc, order_date=:od, delivery_date=:dd, status=:st, memo=:m
+                                SET {name_col}=:c, phone=:p, product_name=:pr, price=:prc, order_date=:od, delivery_date=:dd, status=:st, memo=:m
                                 WHERE id=:id
                             """), {"c": edit_name, "p": edit_phone, "pr": edit_product, "prc": edit_price, "od": edit_order_date, "dd": edit_delivery_date, "st": edit_status, "m": edit_memo, "id": selected_id})
                             conn.commit()
@@ -168,7 +165,26 @@ if engine:
         except Exception as e:
             st.error(f"고객 목록을 가져오는 중 오류가 발생했습니다: {e}")
 
-    # 4. 데이터 CSV 백업
+    # 4. 알림 발송 현황 (복원 완료!)
+    elif menu == "🔔 알림 발송 현황":
+        st.header("🔔 픽업/배송 알림 발송 현황")
+        st.write("오늘 및 향후 픽업/배송 예정인 고객들의 알림 상태를 확인합니다.")
+        
+        try:
+            df_orders, _ = get_orders_df(engine)
+            if not df_orders.empty:
+                # 상태가 완료/취소가 아닌 내역 필터링
+                upcoming_orders = df_orders[~df_orders['상태'].isin(['완료', '취소'])]
+                st.subheader("📌 픽업/배송 대기 목록")
+                st.dataframe(upcoming_orders, use_container_width=True)
+                
+                st.info("💡 솔라피(Solapi) 카카오 알림톡 서비스 연동 준비 완료 상태입니다.")
+            else:
+                st.info("현재 대기 중인 픽업/배송 알림이 없습니다.")
+        except Exception as e:
+            st.error(f"알림 현황을 불러오는 중 오류가 발생했습니다: {e}")
+
+    # 5. 데이터 CSV 백업
     elif menu == "📥 데이터 CSV 백업":
         st.header("📥 데이터 CSV 백업 (엑셀 저장)")
         st.write("엑셀에서 한글이 깨지지 않도록 인코딩(UTF-8 BOM) 처리된 파일입니다.")
