@@ -4,7 +4,6 @@ import pytz
 
 st.set_page_config(page_title="화사한 하루", layout="wide")
 
-# 현재 한국 시간(KST) 가져오기 함수
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
@@ -14,6 +13,11 @@ st.markdown("""
     
     * {
         font-family: 'Pretendard', sans-serif !important;
+    }
+    
+    /* 사이드바 상단 깨지는 텍스트 숨기기 및 정리 */
+    [data-testid="stSidebarNav"] {
+        padding-top: 1rem;
     }
     
     /* 제목 글씨 크기 및 행간 */
@@ -69,7 +73,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 사이드바 메뉴 (화살표 이모지 복원)
+# 사이드바 메뉴
 with st.sidebar:
     st.title("📌 메뉴")
     menu = st.radio("이동할 메뉴를 선택하세요", [
