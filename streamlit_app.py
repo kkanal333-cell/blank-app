@@ -8,6 +8,21 @@ st.set_page_config(page_title="화사한 하루", layout="wide")
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
+# 세션 스테이트에 주문 데이터 초기화 (기존 데이터 구조 유지)
+if 'orders' not in st.session_state:
+    st.session_state.orders = [
+        {
+            "고객성명": "김화사",
+            "휴대폰번호": "010-1234-5678",
+            "주문상품명": "꽃다발",
+            "결제금액": 55000,
+            "픽업일시": "2026-08-14 PM 14:00",
+            "접수일시": "2026-08-14 16:04",
+            "결제내역": "네이버",
+            "메모": "예쁘게 만들어주세요"
+        }
+    ]
+
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -90,7 +105,7 @@ st.markdown('<div class="app-title">💐 화사한 하루 고객 & 주문 관리
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📝 신규 주문", 
-    "📋 주문 목록 & 달력", 
+    "📋 전체 주문 목록 & 달력", 
     "🎂 고객 관리", 
     "🔔 알림 현황", 
     "📥 데이터 백업"
@@ -102,64 +117,73 @@ with tab1:
 
     with st.form("main_form"):
         c1, c2 = st.columns(2)
-        with c1: st.text_input("고객 성명 *")
-        with c2: st.text_input("휴대폰 번호", value="010-")
+        with c1: cust_name = st.text_input("고객 성명 *")
+        with c2: cust_phone = st.text_input("휴대폰 번호", value="010-")
         
         c3, c4 = st.columns(2)
-        with c3: st.selectbox("주문 상품명 *", ["꽃다발", "꽃바구니", "기타"])
-        with c4: st.number_input("결제 금액 (원)", value=55000)
+        with c3: prod_name = st.selectbox("주문 상품명 *", ["꽃다발", "꽃바구니", "기타"])
+        with c4: prod_price = st.number_input("결제 금액 (원)", value=55000)
         
         p1, p2, p3 = st.columns([2.2, 1, 1.4])
-        with p1: st.date_input("픽업 일시 *", now_kst.date(), key="p_date")
-        with p2: st.selectbox(" ", ["AM", "PM"], index=1, key="p_period", label_visibility="collapsed")
-        with p3: st.time_input(" ", time(14, 0), key="p_time", label_visibility="collapsed")
+        with p1: p_date = st.date_input("픽업 일시 *", now_kst.date(), key="p_date")
+        with p2: p_period = st.selectbox(" ", ["AM", "PM"], index=1, key="p_period", label_visibility="collapsed")
+        with p3: p_time = st.time_input(" ", time(14, 0), key="p_time", label_visibility="collapsed")
         
         curr_hour_24 = now_kst.hour
         is_pm = curr_hour_24 >= 12
-        curr_hour_12 = curr_hour_24 if curr_hour_24 <= 12 else curr_hour_24 - 12
+        curr_hour_12 = curr_hour_24 if curr_hour_12 <= 12 else curr_hour_24 - 12
         curr_hour_12 = 12 if curr_hour_12 == 0 else curr_hour_12
         
         o1, o2, o3 = st.columns([2.2, 1, 1.4])
-        with o1: st.date_input("접수 일시 *", now_kst.date(), key="o_date")
-        with o2: st.selectbox("  ", ["AM", "PM"], index=1 if is_pm else 0, key="o_period", label_visibility="collapsed")
-        with o3: st.time_input("  ", time(curr_hour_12, now_kst.minute), key="o_time", label_visibility="collapsed")
+        with o1: o_date = st.date_input("접수 일시 *", now_kst.date(), key="o_date")
+        with o2: o_period = st.selectbox("  ", ["AM", "PM"], index=1 if is_pm else 0, key="o_period", label_visibility="collapsed")
+        with o3: o_time = st.time_input("  ", time(curr_hour_12, now_kst.minute), key="o_time", label_visibility="collapsed")
         
-        st.selectbox("결제내역 *", ["네이버", "전화", "입금", "현금"])
-        st.text_area("고객 요구사항 / 메모", height=70)
+        pay_method = st.selectbox("결제내역 *", ["네이버", "전화", "입금", "현금"])
+        memo = st.text_area("고객 요구사항 / 메모", height=70)
         
-        st.form_submit_button("🌸 주문 저장하기", use_container_width=True)
+        submitted = st.form_submit_button("🌸 주문 저장하기", use_container_width=True)
+        if submitted:
+            if not cust_name:
+                st.warning("고객 성명을 입력해주세요.")
+            else:
+                new_order = {
+                    "고객성명": cust_name,
+                    "휴대폰번호": cust_phone,
+                    "주문상품명": prod_name,
+                    "결제금액": prod_price,
+                    "픽업일시": f"{p_date} {p_period} {p_time.strftime('%H:%M')}",
+                    "접수일시": f"{o_date} {o_time.strftime('%H:%M')}",
+                    "결제내역": pay_method,
+                    "메모": memo
+                }
+                st.session_state.orders.append(new_order)
+                st.success(f"'{cust_name}'님의 주문이 성공적으로 저장되었습니다!")
 
 with tab2:
-    st.markdown('<div class="section-title">📋 전체 주문 목록 & 캘린더 뷰</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">📋 전체 주문 목록 & 달력</div>', unsafe_allow_html=True)
     
-    # 캘린더와 목록을 보기 좋게 분리
-    col_cal, col_list = st.columns([1, 1.2])
+    # 기존에 사용하시던 달력 및 주문 목록 배치 복원
+    col_cal, col_list = st.columns([1, 1.3])
     with col_cal:
-        st.subheader("📅 픽업 캘린더")
-        selected_date = st.date_input("날짜 선택", date.today(), label_visibility="collapsed")
-        st.info(f"📌 **{selected_date}** 픽업 예정 주문이 아래에 표시됩니다.")
+        st.subheader("📅 날짜 선택 캘린더")
+        cal_date = st.date_input("달력 날짜 선택", date.today(), key="calendar_view_date")
+        st.info(f"📌 선택하신 **{cal_date}** 일자의 픽업 주문을 확인합니다.")
         
     with col_list:
-        st.subheader("📋 주문 내역 상세")
-        sample_data = pd.DataFrame({
-            "고객명": ["김화사", "이플라워"],
-            "연락처": ["010-1234-5678", "010-9876-5432"],
-            "상품": ["꽃다발", "꽃바구니"],
-            "픽업시간": ["PM 14:00", "PM 13:00"],
-            "금액": ["55,000원", "70,000원"]
-        })
-        st.dataframe(sample_data, use_container_width=True)
+        st.subheader("📋 전체 주문 내역")
+        df_orders = pd.DataFrame(st.session_state.orders)
+        st.dataframe(df_orders, use_container_width=True)
 
 with tab3:
     st.markdown('<div class="section-title">🎂 고객 관리</div>', unsafe_allow_html=True)
-    st.text_input("🔍 등록된 고객 검색", placeholder="고객 이름 또는 연락처 검색")
-    customer_data = pd.DataFrame({
-        "고객명": ["김화사", "이플라워"],
-        "연락처": ["010-1234-5678", "010-9876-5432"],
-        "총 주문 횟수": [3, 1],
-        "최근 주문일": ["2026-08-14", "2026-08-14"]
-    })
-    st.dataframe(customer_data, use_container_width=True)
+    search_query = st.text_input("🔍 등록된 고객 검색", placeholder="고객 이름 또는 연락처 검색")
+    
+    if st.session_state.orders:
+        df_cust = pd.DataFrame(st.session_state.orders)[["고객성명", "휴대폰번호", "주문상품명", "접수일시"]]
+        st.dataframe(df_cust, use_container_width=True)
+    else:
+        st.info("등록된 고객 정보가 없습니다.")
 
 with tab4:
     st.markdown('<div class="section-title">🔔 알림 발송 현황</div>', unsafe_allow_html=True)
@@ -168,4 +192,13 @@ with tab4:
 with tab5:
     st.markdown('<div class="section-title">📥 데이터 CSV 백업</div>', unsafe_allow_html=True)
     st.write("저장된 전체 주문 및 고객 데이터를 CSV 파일로 다운로드합니다.")
-    st.download_button("📂 전체 데이터 CSV 다운로드", data="sample,csv,data", file_name="order_backup.csv", use_container_width=True)
+    if st.session_state.orders:
+        df_csv = pd.DataFrame(st.session_state.orders)
+        csv_data = df_csv.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            "📂 전체 데이터 CSV 다운로드", 
+            data=csv_data, 
+            file_name="order_backup.csv", 
+            mime="text/csv",
+            use_container_width=True
+        )
