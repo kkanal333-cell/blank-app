@@ -339,6 +339,7 @@ if engine:
                                         """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_cal_id)})
                                         conn.commit()
                                     st.success(f"수정이 완료되었습니다. ({chosen_cal_id}번 주문)")
+                                    st.rerun()
                                 except Exception as e:
                                     st.error(f"수정 실패: {e}")
                                 
@@ -348,6 +349,7 @@ if engine:
                                         conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": int(chosen_cal_id)})
                                         conn.commit()
                                     st.warning(f"삭제가 완료되었습니다. ({chosen_cal_id}번 주문)")
+                                    st.rerun()
                                 except Exception as e:
                                     st.error(f"삭제 실패: {e}")
                     else:
@@ -446,6 +448,7 @@ if engine:
                                     """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_id)})
                                     conn.commit()
                                 st.success("수정이 완료되었습니다.")
+                                st.rerun()
                             except Exception as e:
                                 st.error(f"수정 실패: {e}")
                             
@@ -455,6 +458,7 @@ if engine:
                                     conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": int(chosen_id)})
                                     conn.commit()
                                 st.warning("삭제가 완료되었습니다.")
+                                st.rerun()
                             except Exception as e:
                                 st.error(f"삭제 실패: {e}")
         except Exception as e:
@@ -476,6 +480,7 @@ if engine:
                     conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p)"), {"n": name, "p": phone})
                     conn.commit()
                 st.success(f"'{name}' 고객님이 등록되었습니다!")
+                st.rerun()
                 
         try:
             df_customers = pd.read_sql("SELECT id as ID, name as 고객명, phone as 연락처 FROM customers ORDER BY id DESC", engine)
@@ -504,33 +509,102 @@ if engine:
         except Exception as e:
             st.error(f"알림 현황 조회 실패: {e}")
 
-    # 5. 데이터 CSV 백업
+    # 5. 데이터 CSV 백업 및 불러오기 (복원)
     elif menu == "📥 데이터 CSV 백업":
-        st.header("📥 데이터 CSV 백업 (엑셀 저장)")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("1. 전체 주문 내역")
-            try:
-                df_orders = pd.read_sql("""
-                    SELECT o.id as 주문ID, c.name as 고객명, c.phone as 연락처, o.product_name as 상품명, o.amount as 결제금액, o.created_at as 접수일시, o.pickup_datetime as 픽업일시, o.status as 상태
-                    FROM orders o LEFT JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC
-                """, engine)
-                if not df_orders.empty:
-                    csv_orders = df_orders.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-                    st.download_button("📥 주문 내역 엑셀다운로드", data=csv_orders, file_name="화사한하루_주문내역백업.csv", mime="text/csv", use_container_width=True)
-                else:
-                    st.info("등록된 주문 내역이 없습니다.")
-            except Exception as e:
-                st.error(f"오류: {e}")
+        st.header("📥 데이터 CSV 백업 및 불러오기 (복원)")
+        
+        tab_export, tab_import = st.tabs(["📤 데이터 내보내기 (백업)", "📥 데이터 불러오기 (복원)"])
+        
+        # --- [TAB 1] 데이터 내보내기 ---
+        with tab_export:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("1. 전체 주문 내역 백업")
+                try:
+                    df_orders = pd.read_sql("""
+                        SELECT o.id as 주문ID, c.name as 고객명, c.phone as 연락처, o.product_name as 상품명, 
+                               o.amount as 결제금액, o.created_at as 접수일시, o.pickup_datetime as 픽업일시, o.status as 상태
+                        FROM orders o LEFT JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC
+                    """, engine)
+                    if not df_orders.empty:
+                        csv_orders = df_orders.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+                        st.download_button("📥 주문 내역 CSV 다운로드", data=csv_orders, file_name="화사한하루_주문내역백업.csv", mime="text/csv", use_container_width=True)
+                    else:
+                        st.info("등록된 주문 내역이 없습니다.")
+                except Exception as e:
+                    st.error(f"오류: {e}")
 
-        with col2:
-            st.subheader("2. 전체 고객 목록")
-            try:
-                df_customers = pd.read_sql("SELECT id as ID, name as 고객명, phone as 연락처 FROM customers ORDER BY id DESC", engine)
-                if not df_customers.empty:
-                    csv_customers = df_customers.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-                    st.download_button("📥 고객 목록 엑셀다운로드", data=csv_customers, file_name="화사한하루_고객목록백업.csv", mime="text/csv", use_container_width=True)
-                else:
-                    st.info("등록된 고객 정보가 없습니다.")
-            except Exception as e:
-                st.error(f"오류: {e}")
+            with col2:
+                st.subheader("2. 전체 고객 목록 백업")
+                try:
+                    df_customers = pd.read_sql("SELECT id as ID, name as 고객명, phone as 연락처 FROM customers ORDER BY id DESC", engine)
+                    if not df_customers.empty:
+                        csv_customers = df_customers.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+                        st.download_button("📥 고객 목록 CSV 다운로드", data=csv_customers, file_name="화사한하루_고객목록백업.csv", mime="text/csv", use_container_width=True)
+                    else:
+                        st.info("등록된 고객 정보가 없습니다.")
+                except Exception as e:
+                    st.error(f"오류: {e}")
+
+        # --- [TAB 2] 데이터 불러오기 (복원) ---
+        with tab_import:
+            st.subheader("📥 기존 CSV 백업 파일 불러오기")
+            st.caption("⚠️ 업로드한 CSV 파일의 데이터가 DB에 반영되며, 기존 달력 및 목록에 자동으로 즉시 업데이트됩니다.")
+            
+            upload_type = st.radio("불러올 데이터 유형을 선택하세요", ["주문 내역 CSV", "고객 목록 CSV"], horizontal=True)
+            uploaded_file = st.file_uploader("CSV 파일을 선택하세요", type=["csv"])
+            
+            if uploaded_file is not None:
+                try:
+                    df_upload = pd.read_csv(uploaded_file, encoding='utf-8-sig')
+                    st.write("📋 **불러온 파일 미리보기:**")
+                    st.dataframe(df_upload.head(5), use_container_width=True)
+                    
+                    if st.button("🚀 데이터 DB에 적용하기", use_container_width=True):
+                        with engine.connect() as conn:
+                            success_cnt = 0
+                            
+                            if upload_type == "고객 목록 CSV":
+                                for _, row in df_upload.iterrows():
+                                    c_name = str(row.get('고객명', '')).strip()
+                                    c_phone = str(row.get('연락처', '')).strip()
+                                    if c_name and c_name != 'nan':
+                                        res = conn.execute(text("SELECT id FROM customers WHERE name=:n AND phone=:p LIMIT 1"), {"n": c_name, "p": c_phone}).fetchone()
+                                        if not res:
+                                            conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p)"), {"n": c_name, "p": c_phone})
+                                            success_cnt += 1
+                                conn.commit()
+
+                            elif upload_type == "주문 내역 CSV":
+                                for _, row in df_upload.iterrows():
+                                    c_name = str(row.get('고객명', '')).strip()
+                                    c_phone = str(row.get('연락처', '')).strip() if pd.notnull(row.get('연락처')) else ""
+                                    p_name = str(row.get('상품명', '')).strip()
+                                    
+                                    if c_name and p_name and c_name != 'nan' and p_name != 'nan':
+                                        res = conn.execute(text("SELECT id FROM customers WHERE name=:n AND phone=:p LIMIT 1"), {"n": c_name, "p": c_phone}).fetchone()
+                                        if res:
+                                            cid = int(res[0])
+                                        else:
+                                            ins_res = conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p) RETURNING id"), {"n": c_name, "p": c_phone})
+                                            cid = int(ins_res.fetchone()[0])
+                                        
+                                        amount = int(row.get('결제금액', 0)) if pd.notnull(row.get('결제금액')) else 0
+                                        status = str(row.get('상태', '접수'))
+                                        created_at = pd.to_datetime(row.get('접수일시')).to_pydatetime() if pd.notnull(row.get('접수일시')) else get_kst_now()
+                                        pickup_dt = pd.to_datetime(row.get('픽업일시')).to_pydatetime() if pd.notnull(row.get('픽업일시')) else get_kst_now()
+                                        
+                                        conn.execute(text("""
+                                            INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime, status, created_at)
+                                            VALUES (:cid, :pn, :p, :am, :pdt, :st, :cat)
+                                        """), {
+                                            "cid": cid, "pn": p_name, "p": p_name,
+                                            "am": amount, "pdt": pickup_dt, "st": status, "cat": created_at
+                                        })
+                                        success_cnt += 1
+                                conn.commit()
+                                
+                        st.rerun()
+
+                except Exception as e:
+                    st.error(f"CSV 파일 처리 중 오류가 발생했습니다: {e}")
