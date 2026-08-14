@@ -15,9 +15,16 @@ st.markdown("""
         font-family: 'Pretendard', sans-serif !important;
     }
     
-    /* 사이드바 상단 깨지는 텍스트 숨기기 및 정리 */
-    [data-testid="stSidebarNav"] {
-        padding-top: 1rem;
+    /* 사이드바 상단 깨지는 텍스트(keyboard_double_arrow 등) 강제 숨김 */
+    [data-testid="collapsedControl"] span, section[data-testid="stSidebar"] span {
+        /* 아이콘 텍스트 깨짐 방지 */
+    }
+    button[kind="header"] svg {
+        display: inline-block;
+    }
+    /* 사이드바 상단 불필요한 텍스트 노드 숨기기 */
+    div[data-testid="stSidebarNav"] + div {
+        display: none;
     }
     
     /* 제목 글씨 크기 및 행간 */
@@ -73,7 +80,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 사이드바 메뉴
 with st.sidebar:
     st.title("📌 메뉴")
     menu = st.radio("이동할 메뉴를 선택하세요", [
