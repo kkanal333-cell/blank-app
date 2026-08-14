@@ -1,6 +1,6 @@
 streamlit
 pandas
+pytz
 sqlalchemy
 psycopg2-binary
-pytz
 streamlit-calendar
