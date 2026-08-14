@@ -8,112 +8,72 @@ from streamlit_calendar import calendar
 # 페이지 기본 설정
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리", layout="wide", page_icon="💐")
 
-# 모바일 화면 최적화를 위한 상단 여백 대폭 축소 CSS 적용
+# 모바일 상단 여백 강제 제거 CSS
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* 상단 기본 여백 최소화 (여백 없애기) */
-    .main .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
-        padding-left: 0.8rem !important;
-        padding-right: 0.8rem !important;
+    /* 상단 상단바(Header) 높이 및 패딩을 0에 가깝게 강제 제거 */
+    header[data-testid="stHeader"] {
+        height: 2rem !important;
+        background: transparent !important;
     }
     
-    /* 헤더 패딩 축소 */
-    header[data-testid="stHeader"] {
-        background-color: transparent !important;
-        height: 2.5rem !important;
+    /* 메인 컨테이너 최상단 여백 강제 제거 */
+    .main .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+        margin-top: -2rem !important;
     }
 
-    /* 모바일/PC 사이드바 버튼 및 토글 항상 보이도록 지정 */
-    [data-testid="stSidebarNav"] {
-        display: block !important;
-    }
-
-    /* 아이콘 폰트(Material Symbols)가 Pretendard로 깨지는 문제 방지 */
+    /* 아이콘 폰트 깨짐 방지 */
     [class*="material-symbols"], [class*="MaterialIcons"], i {
         font-family: 'Material Symbols Outlined', 'Material Icons' !important;
     }
     
-    /* 깔끔한 모던 고딕 폰트 전면 적용 */
+    /* 폰트 기본 설정 */
     html, body, [class*="css"], .stMarkdown, p, div, span, button, input, select {
-        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
         color: #2D3748;
     }
 
-    /* 메인 타이틀 크기 및 여백 슬림화 */
+    /* 제목 크기 및 여백 극소화 */
     h1 {
-        font-size: 1.3rem !important;
+        font-size: 1.25rem !important;
         font-weight: 700 !important;
         color: #582C83 !important;
-        margin-top: 0rem !important;
-        margin-bottom: 0.5rem !important;
-        padding-top: 0rem !important;
+        margin-top: 0 !important;
+        margin-bottom: 0.3rem !important;
+        padding-top: 0 !important;
     }
     h2 {
-        font-size: 1.1rem !important;
+        font-size: 1.05rem !important;
         font-weight: 600 !important;
         color: #4A5568 !important;
-        margin-top: 0.4rem !important;
-        margin-bottom: 0.4rem !important;
+        margin-top: 0.3rem !important;
+        margin-bottom: 0.3rem !important;
     }
-    h3 {
-        font-size: 0.95rem !important;
-        font-weight: 600 !important;
-        color: #4A5568 !important;
+    
+    /* 폼/인풋 요소 간격 축소 */
+    div[data-testid="stForm"] {
+        padding: 0.8rem !important;
     }
 
-    /* 소프트 파스텔 버튼 스타일 */
+    /* 버튼 스타일 */
     .stButton>button {
         border-radius: 8px !important;
         background-color: #F3EEF9 !important;
         color: #582C83 !important;
         border: 1px solid #E2D5F1 !important;
         font-weight: 600 !important;
-        transition: all 0.2s ease;
-    }
-    .stButton>button:hover {
-        background-color: #E2D5F1 !important;
-        border-color: #D1BCED !important;
-        color: #3D1C5C !important;
     }
 
-    /* 달력 커스텀 (소프트 파스텔 톤) */
-    .fc-button-primary {
-        background-color: #F3EEF9 !important;
-        border-color: #E2D5F1 !important;
-        color: #582C83 !important;
-        box-shadow: none !important;
-        text-transform: capitalize !important;
-        border-radius: 6px !important;
-    }
-    .fc-button-primary:hover {
-        background-color: #E2D5F1 !important;
-        border-color: #D1BCED !important;
-        color: #3D1C5C !important;
-    }
+    /* 달력 헤더 축소 */
     .fc-toolbar-title {
-        font-size: 1.0rem !important;
+        font-size: 0.95rem !important;
         font-weight: 700 !important;
-        color: #4A5568 !important;
-    }
-    .fc-theme-standard td, .fc-theme-standard th {
-        border-color: #EDF2F7 !important;
-    }
-    .fc-day-today {
-        background-color: #FAF5FF !important;
-    }
-    
-    /* 탭 스타일 및 여백 줄이기 */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 4px;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #582C83 !important;
-        font-weight: bold;
-        border-bottom: 2px solid #582C83 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -139,7 +99,6 @@ def get_connection():
 
 engine = get_connection()
 
-# 필요한 칼럼(payment_method, memo) 자동 추가 체크
 if engine:
     try:
         with engine.connect() as conn:
@@ -286,11 +245,11 @@ if engine:
                 calendar_options = {
                     "headerToolbar": {"left": "prev,next today", "center": "title", "right": ""},
                     "initialView": "dayGridMonth",
-                    "height": 550,
+                    "height": 520,
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v12")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v13")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
@@ -391,7 +350,7 @@ if engine:
                 else:
                     st.info("👆 달력에서 특정 날짜나 주문을 선택해 보세요.")
 
-            # --- [TAB 2] 전체 주문 목록 및 수정/삭제 ---
+            # --- [TAB 2] 전체 주문 목록 ---
             with tab2:
                 st.subheader("📊 전체 주문 목록")
                 
@@ -549,7 +508,6 @@ if engine:
         
         tab_export, tab_import = st.tabs(["📤 데이터 내보내기 (백업)", "📥 데이터 불러오기 (복원)"])
         
-        # --- [TAB 1] 데이터 내보내기 ---
         with tab_export:
             col1, col2 = st.columns(2)
             with col1:
@@ -581,7 +539,6 @@ if engine:
                 except Exception as e:
                     st.error(f"오류: {e}")
 
-        # --- [TAB 2] 데이터 불러오기 (복원) ---
         with tab_import:
             st.subheader("📥 기존 CSV 백업 파일 불러오기")
             st.caption("⚠️ 업로드한 CSV 파일의 데이터가 DB에 반영되며, 기존 달력 및 목록에 자동으로 즉시 업데이트됩니다.")
