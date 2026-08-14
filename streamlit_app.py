@@ -43,6 +43,9 @@ if engine:
     if menu == "📝 신규 주문 및 고객 등록":
         st.header("📝 신규 주문 및 고객 등록")
         
+        # 현재 시각 구하기
+        now = datetime.now()
+        
         with st.form("order_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
@@ -50,11 +53,23 @@ if engine:
                 phone = st.text_input("휴대폰 번호")
                 product_name = st.text_input("주문 상품명 *")
                 amount = st.number_input("결제 금액 (원)", min_value=0, step=1000, value=50000)
+                
             with col2:
-                pickup_date = st.date_input("픽업 날짜", datetime.now().date())
-                pickup_time = st.time_input("픽업 시간", time(14, 0)) # 기본 오후 2시
+                # 📅 접수 날짜/시간 (기본값: 현재 날짜 및 현재 시간)
+                sub_col1, sub_col2 = st.columns(2)
+                with sub_col1:
+                    order_date = st.date_input("접수 날짜", now.date())
+                with sub_col2:
+                    order_time = st.time_input("접수 시간", now.time())
+                
+                # 🚚 픽업/배송 날짜/시간
+                sub_col3, sub_col4 = st.columns(2)
+                with sub_col3:
+                    pickup_date = st.date_input("픽업 날짜", now.date())
+                with sub_col4:
+                    pickup_time = st.time_input("픽업 시간", time(14, 0)) # 기본 오후 2시
+                    
                 status = st.selectbox("상태", ["접수", "제작중", "배송중", "완료", "취소"])
-                memo = st.text_area("특이사항 / 메모")
             
             submit = st.form_submit_button("주문 저장하기", use_container_width=True)
             if submit:
@@ -62,11 +77,12 @@ if engine:
                     st.warning("고객 이름과 주문 상품명은 필수 입력 항목입니다.")
                 else:
                     try:
-                        # 픽업 날짜와 시간 합치기 (YYYY-MM-DD HH:MM:SS)
+                        # 접수 및 픽업 Datetime 결합
+                        order_datetime = datetime.combine(order_date, order_time)
                         pickup_datetime = datetime.combine(pickup_date, pickup_time)
                         
                         with engine.connect() as conn:
-                            # 1. 기존 고객 확인 또는 신규 고객 생성 -> customer_id 구하기
+                            # 1. 고객 확인 및 추가
                             res = conn.execute(text("SELECT id FROM customers WHERE name = :n AND phone = :p LIMIT 1"), {"n": customer_name, "p": phone}).fetchone()
                             if res:
                                 customer_id = res[0]
@@ -74,17 +90,18 @@ if engine:
                                 ins_res = conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p) RETURNING id"), {"n": customer_name, "p": phone})
                                 customer_id = ins_res.fetchone()[0]
                             
-                            # 2. orders 테이블에 주문 추가
+                            # 2. 주문 등록 (created_at에 접수일시 반영)
                             conn.execute(text("""
-                                INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime, status)
-                                VALUES (:cid, :pn, :p, :am, :pdt, :st)
+                                INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime, status, created_at)
+                                VALUES (:cid, :pn, :p, :am, :pdt, :st, :cat)
                             """), {
                                 "cid": customer_id,
                                 "pn": product_name,
                                 "p": product_name,
                                 "am": amount,
                                 "pdt": pickup_datetime,
-                                "st": status
+                                "st": status,
+                                "cat": order_datetime
                             })
                             conn.commit()
                         st.success(f"'{customer_name}'님의 주문이 성공적으로 저장되었습니다!")
@@ -96,7 +113,6 @@ if engine:
         st.header("📋 전체 주문 내역 및 수정/삭제")
         
         try:
-            # JOIN을 통해 id 대신 고객명, 연락처 조합해서 불러오기
             query = """
                 SELECT 
                     o.id as 주문ID,
@@ -104,6 +120,7 @@ if engine:
                     c.phone as 연락처,
                     o.product_name as 상품명,
                     o.amount as 금액,
+                    o.created_at as 접수일시,
                     o.pickup_datetime as 픽업일시,
                     o.status as 상태,
                     o.customer_id
@@ -113,7 +130,6 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
-            # 목록 화면에 표시할 데이터프레임
             display_df = df_orders.drop(columns=['customer_id'], errors='ignore')
             st.dataframe(display_df, use_container_width=True)
             
@@ -126,7 +142,7 @@ if engine:
                 
                 selected_row = df_orders[df_orders['주문ID'] == selected_id].iloc[0]
                 
-                # 기존 픽업 datetime에서 날짜와 시간 분리
+                curr_cat = pd.to_datetime(selected_row['접수일시']) if pd.notnull(selected_row['접수일시']) else datetime.now()
                 curr_pdt = pd.to_datetime(selected_row['픽업일시']) if pd.notnull(selected_row['픽업일시']) else datetime.now()
                 
                 with st.form("edit_order_form"):
@@ -137,8 +153,17 @@ if engine:
                         edit_product = st.text_input("상품명", value=str(selected_row['상품명'] or ""))
                         edit_amount = st.number_input("금액 (원)", min_value=0, step=1000, value=int(selected_row['금액'] or 0))
                     with col2:
-                        edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date())
-                        edit_pickup_time = st.time_input("픽업 시간", value=curr_pdt.time())
+                        sub_col1, sub_col2 = st.columns(2)
+                        with sub_col1:
+                            edit_order_date = st.date_input("접수 날짜", value=curr_cat.date())
+                        with sub_col2:
+                            edit_order_time = st.time_input("접수 시간", value=curr_cat.time())
+                            
+                        sub_col3, sub_col4 = st.columns(2)
+                        with sub_col3:
+                            edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date())
+                        with sub_col4:
+                            edit_pickup_time = st.time_input("픽업 시간", value=curr_pdt.time())
                         
                         status_list = ["접수", "제작중", "배송중", "완료", "취소"]
                         curr_status = selected_row['상태']
@@ -153,20 +178,19 @@ if engine:
                     
                     if update_btn:
                         try:
+                            edit_cat = datetime.combine(edit_order_date, edit_order_time)
                             edit_pdt = datetime.combine(edit_pickup_date, edit_pickup_time)
                             cid = selected_row['customer_id']
                             
                             with engine.connect() as conn:
-                                # 고객 정보 업데이트
                                 if pd.notnull(cid):
                                     conn.execute(text("UPDATE customers SET name=:n, phone=:p WHERE id=:id"), {"n": edit_name, "p": edit_phone, "id": cid})
                                 
-                                # 주문 정보 업데이트
                                 conn.execute(text("""
                                     UPDATE orders 
-                                    SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st
+                                    SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, created_at=:cat
                                     WHERE id=:id
-                                """), {"pn": edit_product, "am": edit_amount, "pdt": edit_pdt, "st": edit_status, "id": selected_id})
+                                """), {"pn": edit_product, "am": edit_amount, "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": selected_id})
                                 conn.commit()
                             st.success(f"{selected_id}번 주문이 성공적으로 수정되었습니다!")
                             st.rerun()
@@ -220,6 +244,7 @@ if engine:
                     c.name as 고객명,
                     c.phone as 연락처,
                     o.product_name as 상품명,
+                    o.created_at as 접수일시,
                     o.pickup_datetime as 픽업일시,
                     o.status as 상태
                 FROM orders o
@@ -246,7 +271,7 @@ if engine:
             st.subheader("1. 전체 주문 내역")
             try:
                 df_orders = pd.read_sql("""
-                    SELECT o.id, c.name as customer_name, c.phone, o.product_name, o.amount, o.pickup_datetime, o.status, o.created_at 
+                    SELECT o.id, c.name as customer_name, c.phone, o.product_name, o.amount, o.created_at as order_datetime, o.pickup_datetime, o.status
                     FROM orders o LEFT JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC
                 """, engine)
                 if not df_orders.empty:
