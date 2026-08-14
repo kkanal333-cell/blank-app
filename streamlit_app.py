@@ -9,8 +9,21 @@ st.set_page_config(page_title="화사한 하루", layout="wide")
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
+# 세션 상태 초기화 및 샘플/기존 데이터 보존
 if 'orders' not in st.session_state:
-    st.session_state.orders = []
+    st.session_state.orders = [
+        {
+            "고객성명": "김화사",
+            "휴대폰번호": "010-1234-5678",
+            "주문상품명": "꽃다발",
+            "결제금액": 55000,
+            "픽업일자": "2026-08-14",
+            "픽업일시": "2026-08-14 PM 14:00",
+            "접수일시": "2026-08-14 16:04",
+            "결제내역": "네이버",
+            "메모": "예쁘게 만들어주세요"
+        }
+    ]
 
 st.markdown("""
 <style>
@@ -112,8 +125,8 @@ with tab1:
         with c2: cust_phone = st.text_input("휴대폰 번호", value="010-")
         
         c3, c4 = st.columns(2)
-        with c3: prod_name = st.selectbox("주문 상품명 *", ["꽃다발", "꽃바구니", "용돈박스", "화분", "기타"])
-        with c4: prod_price = st.number_input("결제 금액 (원)", value=55000, step=5000)
+        with c3: prod_name = st.selectbox("주문 상품명 *", ["꽃다발", "꽃바구니", "용돈박스", "화분", "근조화환", "축하화환", "기타"])
+        with c4: prod_price = st.number_input("결제 금액 (원)", value=55000, step=1000)
         
         p1, p2, p3 = st.columns([2.2, 1, 1.4])
         with p1: p_date = st.date_input("픽업 일시 *", now_kst.date(), key="p_date")
@@ -125,7 +138,7 @@ with tab1:
         with o2: o_period = st.selectbox("  ", ["AM", "PM"], index=1 if is_pm else 0, key="o_period", label_visibility="collapsed")
         with o3: o_time = st.time_input("  ", time(curr_hour_12, now_kst.minute), key="o_time", label_visibility="collapsed")
         
-        pay_method = st.selectbox("결제내역 *", ["네이버", "전화", "입금", "현금"])
+        pay_method = st.selectbox("결제내역 *", ["네이버", "전화", "입금", "현금", "카드"])
         memo = st.text_area("고객 요구사항 / 메모", height=70)
         
         submitted = st.form_submit_button("🌸 주문 저장하기", use_container_width=True)
@@ -187,14 +200,25 @@ with tab2:
                             
         st.divider()
         st.subheader("📋 전체 주문 상세 내역")
-        st.dataframe(df_orders, use_container_width=True)
+        
+        # 선택된 날짜가 있다면 필터링해서 보여주기
+        if 'selected_cal_date' in st.session_state and st.session_state['selected_cal_date']:
+            sel_date = st.session_state['selected_cal_date']
+            st.info(f"🔍 현재 **{sel_date}** 픽업 주문 내역을 필터링하여 표시 중입니다.")
+            filtered_df = df_orders[df_orders['픽업일자'] == sel_date]
+            st.dataframe(filtered_df, use_container_width=True)
+            if st.button("전체 주문 목록 보기"):
+                del st.session_state['selected_cal_date']
+                st.rerun()
+        else:
+            st.dataframe(df_orders, use_container_width=True)
     else:
         st.info("등록된 주문 내역이 없습니다. '신규 주문' 탭에서 첫 주문을 등록해 보세요!")
 
 with tab3:
     st.markdown('<div class="section-title">🎂 고객 관리</div>', unsafe_allow_html=True)
     if st.session_state.orders:
-        df_cust = pd.DataFrame(st.session_state.orders)[["고객성명", "휴대폰번호", "주문상품명", "접수일시"]]
+        df_cust = pd.DataFrame(st.session_state.orders)[["고객성명", "휴대폰번호", "주문상품명", "결제금액", "접수일시"]]
         st.dataframe(df_cust, use_container_width=True)
     else:
         st.info("등록된 고객 정보가 없습니다.")
