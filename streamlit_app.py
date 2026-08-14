@@ -5,17 +5,101 @@ import pytz
 from sqlalchemy import create_engine, text
 from streamlit_calendar import calendar
 
-# 브라우저 탭 타이틀 & 파스텔 테마 스타일 설정
-st.set_page_config(page_title="화사한 하루 - 고객/주문 관리 시스템", layout="wide", page_icon="💐")
+# 페이지 기본 설정
+st.set_page_config(page_title="화사한 하루 - 고객/주문 관리", layout="wide", page_icon="💐")
 
-# 파스텔 / 보라 톤 CSS 스타일링
+# 간판 느낌의 고급스럽고 세련된 디자인 Custom CSS
 st.markdown("""
 <style>
-    h1 { color: #6B46C1 !important; }
-    h2, h3 { color: #805AD5 !important; }
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');
+
+    /* 전체 기본 폰트 적용 */
+    html, body, [class*="css"], .stMarkdown, p, div, span, button, input {
+        font-family: 'Gowun Dodum', 'Pretendard', sans-serif !important;
+        color: #333333;
+    }
+
+    /* 제목 크기 대폭 축소 및 간판 스타일 포인트 컬러 */
+    h1 {
+        font-size: 1.6rem !important;
+        font-weight: 700 !important;
+        color: #582C83 !important; /* 간판 딥 퍼플 */
+        margin-bottom: 0.8rem !important;
+    }
+    h2 {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: #4A5568 !important; /* 차분한 다크 그레이 */
+        margin-top: 1rem !important;
+    }
+    h3 {
+        font-size: 1.05rem !important;
+        font-weight: 600 !important;
+        color: #4A5568 !important;
+    }
+
+    /* 버튼 스타일 - 소프트 파스텔 퍼플 */
     .stButton>button {
-        border-radius: 8px;
-        border: 1px solid #D6BCFA;
+        border-radius: 8px !important;
+        background-color: #F3EEF9 !important;
+        color: #582C83 !important;
+        border: 1px solid #E2D5F1 !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease;
+    }
+    .stButton>button:hover {
+        background-color: #E2D5F1 !important;
+        border-color: #D1BCED !important;
+        color: #3D1C5C !important;
+    }
+
+    /* 달력 커스텀 (빨간색 / 강한 원색 전면 제거, 은은한 파스텔 톤 적용) */
+    .fc-button-primary {
+        background-color: #F3EEF9 !important;
+        border-color: #E2D5F1 !important;
+        color: #582C83 !important;
+        box-shadow: none !important;
+        text-transform: capitalize !important;
+        border-radius: 6px !important;
+    }
+    .fc-button-primary:hover {
+        background-color: #E2D5F1 !important;
+        border-color: #D1BCED !important;
+        color: #3D1C5C !important;
+    }
+    .fc-button-primary:disabled {
+        background-color: #F7F7F7 !important;
+        border-color: #EAEAEA !important;
+        color: #AAAAAA !important;
+    }
+    .fc-toolbar-title {
+        font-size: 1.15rem !important;
+        font-weight: 700 !important;
+        color: #4A5568 !important;
+    }
+    .fc-theme-standard td, .fc-theme-standard th {
+        border-color: #EDF2F7 !important;
+    }
+    .fc-day-today {
+        background-color: #FAF5FF !important; /* 오늘 날짜 매우 연한 파스텔 보라 배경 */
+    }
+    
+    /* 탭 디자인 강화 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 6px 6px 0px 0px;
+        padding: 8px 16px;
+        background-color: #F7FAFC;
+        color: #718096;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #FFFFFF !important;
+        color: #582C83 !important;
+        font-weight: bold;
+        border-bottom: 2px solid #582C83 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -41,9 +125,9 @@ def get_connection():
 
 engine = get_connection()
 
-st.title("💐 화사한 하루 고객 & 주문 관리 시스템")
+st.title("💐 화사한 하루 고객 & 주문 관리")
 
-st.sidebar.title("📌 메뉴 목록")
+st.sidebar.title("📌 메뉴")
 menu = st.sidebar.radio(
     "메뉴 선택", 
     [
@@ -114,13 +198,13 @@ if engine:
                                 "cat": order_datetime
                             })
                             conn.commit()
-                        st.success(f"'{customer_name}'님의 주문이 성공적으로 저장되었습니다!")
+                        st.success(f"'{customer_name}'님의 주문이 저장되었습니다.")
                     except Exception as e:
                         st.error(f"저장 실패: {e}")
 
     # 2. 주문 내역 관리 및 달력
     elif menu == "📋 전체 주문 목록 & 달력":
-        st.header("📋 전체 주문 내역 및 픽업 달력")
+        st.header("📋 주문 내역 및 픽업 달력")
 
         try:
             query = """
@@ -140,18 +224,19 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
+            # 은은한 고급 파스텔 라벨 색상 설정
             def get_pastel_color(status):
-                if status == '접수': return "#9FA8DA"
-                elif status == '제작중': return "#CE93D8"
-                elif status == '배송중': return "#80DEEA"
-                elif status == '완료': return "#A5D6A7"
-                else: return "#B0BEC5"
+                if status == '접수': return "#E2E8F0"      # 파스텔 쿨그레이
+                elif status == '제작중': return "#E9D8FD"    # 파스텔 퍼플
+                elif status == '배송중': return "#E0F2FE"    # 파스텔 스카이블루
+                elif status == '완료': return "#DCFCE7"      # 파스텔 민트/그린
+                else: return "#F1F5F9"
 
             tab1, tab2 = st.tabs(["📅 픽업 달력", "📊 전체 주문 목록"])
 
             # --- [TAB 1] 픽업 달력 ---
             with tab1:
-                st.caption("💡 달력에서 날짜나 주문 내역 글씨를 클릭하면 아래에 해당 날짜의 주문이 나타납니다.")
+                st.caption("💡 달력 날짜나 주문을 클릭하면 상세 내역 조회가 가능합니다.")
                 
                 calendar_events = []
                 for _, row in df_orders.iterrows():
@@ -164,7 +249,7 @@ if engine:
                             "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
                             "backgroundColor": color,
                             "borderColor": color,
-                            "textColor": "#2C3E50"
+                            "textColor": "#2D3748"
                         })
                 
                 calendar_options = {
@@ -174,7 +259,7 @@ if engine:
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v6")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v7")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
@@ -189,7 +274,7 @@ if engine:
                 st.markdown("---")
                 
                 if clicked_date_str:
-                    st.subheader(f"📌 {clicked_date_str} 픽업 주문 리스트")
+                    st.subheader(f"📌 {clicked_date_str} 픽업 주문 목록")
                     
                     df_orders_temp = df_orders.copy()
                     df_orders_temp['pickup_date_only'] = pd.to_datetime(df_orders_temp['pickup_datetime']).dt.strftime('%Y-%m-%d')
@@ -208,7 +293,7 @@ if engine:
                         st.subheader(f"✏️ {clicked_date_str} 주문 수정 및 삭제")
                         
                         day_order_ids = [int(x) for x in day_orders['id'].tolist()]
-                        chosen_cal_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", day_order_ids, key="cal_tab_selectbox")
+                        chosen_cal_id = st.selectbox("수정/삭제할 주문 번호(ID) 선택", day_order_ids, key="cal_tab_selectbox")
                         
                         cal_selected_row = day_orders[day_orders['id'] == chosen_cal_id].iloc[0]
                         now_kst = get_kst_now()
@@ -270,7 +355,7 @@ if engine:
                     else:
                         st.info(f"{clicked_date_str}에는 예정된 픽업 주문이 없습니다.")
                 else:
-                    st.info("👆 달력에서 특정 날짜나 주문을 클릭하시면 해당 날짜의 픽업 주문 리스트와 수정 폼이 나타납니다.")
+                    st.info("👆 달력에서 특정 날짜나 주문을 클릭해 보세요.")
 
             # --- [TAB 2] 전체 주문 목록 및 수정/삭제 ---
             with tab2:
@@ -282,7 +367,6 @@ if engine:
                     'pickup_datetime': '픽업일시', 'status': '상태'
                 }).drop(columns=['customer_id'], errors='ignore')
                 
-                # 데이터프레임 표시
                 event = st.dataframe(
                     display_df, 
                     use_container_width=True,
@@ -363,7 +447,6 @@ if engine:
                                         WHERE id=:id
                                     """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_id)})
                                     conn.commit()
-                                # 강제 새로고침(st.rerun)을 제거하여 화면을 그대로 유지하고 완료 멘트만 출력
                                 st.success("수정이 완료되었습니다.")
                             except Exception as e:
                                 st.error(f"수정 실패: {e}")
