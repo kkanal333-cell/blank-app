@@ -11,33 +11,20 @@ st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     
-    * {
-        font-family: 'Pretendard', sans-serif !important;
+    * { font-family: 'Pretendard', sans-serif !important; }
+    
+    /* 1. 깨진 텍스트(keyboard_double)를 가진 모든 span을 강제 숨김 */
+    [data-testid="collapsedControl"] span {
+        display: none !important;
     }
     
-    /* 사이드바 토글 버튼 내부의 깨진 텍스트(keyboard_double_arrow)를 완전히 숨김 */
-    [data-testid="collapsedControl"] span, 
-    [data-testid="collapsedControl"] div,
-    button[kind="header"] span,
-    button[kind="header"] div {
-        font-size: 0px !important;
-        color: transparent !important;
-        text-indent: -9999px !important;
-        display: inline-block !important;
-    }
-    
-    /* 토글 버튼 영역 레이아웃 및 화살표 아이콘 정리 */
-    [data-testid="collapsedControl"] {
-        background-color: transparent !important;
-    }
-    [data-testid="collapsedControl"] svg,
-    button[kind="header"] svg {
+    /* 2. 그 자리에 고정된 SVG 아이콘을 주입 (메뉴 확장 버튼) */
+    [data-testid="collapsedControl"]::after {
+        content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23582C83' width='24px' height='24px'%3E%3Cpath d='M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z'/%3E%3C/svg%3E");
         display: block !important;
-        fill: #582C83 !important;
-        width: 20px !important;
-        height: 20px !important;
+        cursor: pointer;
     }
-    
+
     /* 제목 글씨 크기 및 위치 정돈 */
     .app-title {
         font-size: 1.56rem !important;
