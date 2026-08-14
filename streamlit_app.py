@@ -15,20 +15,27 @@ st.markdown("""
         font-family: 'Pretendard', sans-serif !important;
     }
     
-    /* 사이드바 토글 버튼의 깨진 텍스트를 감추고 깔끔한 화살표 아이콘으로 대체 */
+    /* 사이드바 토글 버튼 내부의 깨진 텍스트(keyboard_double_arrow)를 완전히 숨김 */
+    [data-testid="collapsedControl"] span, 
+    [data-testid="collapsedControl"] div,
+    button[kind="header"] span,
+    button[kind="header"] div {
+        font-size: 0px !important;
+        color: transparent !important;
+        text-indent: -9999px !important;
+        display: inline-block !important;
+    }
+    
+    /* 토글 버튼 영역 레이아웃 및 화살표 아이콘 정리 */
     [data-testid="collapsedControl"] {
         background-color: transparent !important;
     }
-    [data-testid="collapsedControl"] *:not(svg) {
-        font-size: 0px !important;
-        color: transparent !important;
-        display: none !important;
-    }
-    [data-testid="collapsedControl"] svg {
-        width: 22px !important;
-        height: 22px !important;
-        fill: #582C83 !important;
+    [data-testid="collapsedControl"] svg,
+    button[kind="header"] svg {
         display: block !important;
+        fill: #582C83 !important;
+        width: 20px !important;
+        height: 20px !important;
     }
     
     /* 제목 글씨 크기 및 위치 정돈 */
