@@ -8,7 +8,7 @@ from streamlit_calendar import calendar
 # 페이지 기본 설정
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리", layout="wide", page_icon="💐")
 
-# 모바일 화면 최적화를 위한 CSS (반응형 미디어 쿼리 포함)
+# 스타일 설정
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -18,15 +18,37 @@ st.markdown("""
         font-family: 'Material Symbols Outlined', 'Material Icons' !important;
     }
     
-    /* 폰트 기본 설정 */
+    /* 기본 전제 폰트 및 컬러 복원 */
     html, body, [class*="css"], .stMarkdown, p, div, span, button, input, select {
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-        color: #2D3748;
     }
 
-    /* === 모바일 전용 극단적 여백 제거 (768px 이하) === */
+    /* === PC 화면 전용 복원 (769px 이상) === */
+    @media (min-width: 769px) {
+        .main .block-container {
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+            max-width: 100% !important;
+        }
+        h1 {
+            font-size: 2.1rem !important;
+            font-weight: 700 !important;
+            color: #582C83 !important;
+            margin-bottom: 1rem !important;
+        }
+        h2 {
+            font-size: 1.5rem !important;
+            font-weight: 600 !important;
+            color: #2D3748 !important;
+        }
+        h3 {
+            font-size: 1.2rem !important;
+            font-weight: 600 !important;
+        }
+    }
+
+    /* === 모바일 전용 여백 제로화 (768px 이하) === */
     @media (max-width: 768px) {
-        /* 상단 헤더 공간 및 패딩 완전히 제로화 */
         header[data-testid="stHeader"] {
             height: 0rem !important;
             min-height: 0rem !important;
@@ -35,23 +57,20 @@ st.markdown("""
             margin: 0 !important;
         }
 
-        /* 툴바/상단 바 여백 제거 */
         [data-testid="stHeader"] > div {
             padding: 0 !important;
         }
 
-        /* 메인 컨테이너 최상단 패딩 제거 및 위치 끌어올리기 */
         .main .block-container {
             padding-top: 0.2rem !important;
             padding-bottom: 0.5rem !important;
             padding-left: 0.3rem !important;
             padding-right: 0.3rem !important;
-            margin-top: -3.5rem !important; /* 상단 빈 공간 위로 강제 이동 */
+            margin-top: -3.5rem !important;
         }
 
-        /* 메인 타이틀(h1) 여백 완전히 붙이기 */
         h1 {
-            font-size: 1.15rem !important;
+            font-size: 1.25rem !important;
             font-weight: 700 !important;
             color: #582C83 !important;
             margin-top: 0 !important;
@@ -61,32 +80,23 @@ st.markdown("""
         }
 
         h2 {
-            font-size: 1.0rem !important;
+            font-size: 1.05rem !important;
             font-weight: 600 !important;
-            color: #4A5568 !important;
+            color: #2D3748 !important;
             margin-top: 0.2rem !important;
             margin-bottom: 0.2rem !important;
         }
 
-        /* 폼 내부 여백 절반 축소 */
         div[data-testid="stForm"] {
             padding: 0.5rem !important;
         }
 
-        /* 탭 간격 및 여백 축소 */
         .stTabs [data-baseweb="tab-list"] {
             gap: 2px !important;
         }
     }
 
-    /* PC/기본 스타일 설정 */
-    @media (min-width: 769px) {
-        .main .block-container {
-            padding-top: 2rem !important;
-        }
-    }
-
-    /* 버튼 스타일 */
+    /* 공통 버튼 스타일 */
     .stButton>button {
         border-radius: 8px !important;
         background-color: #F3EEF9 !important;
@@ -95,9 +105,9 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* 달력 헤더 */
+    /* 달력 타이틀 */
     .fc-toolbar-title {
-        font-size: 0.95rem !important;
+        font-size: 1.05rem !important;
         font-weight: 700 !important;
     }
 </style>
@@ -274,7 +284,7 @@ if engine:
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v14")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v15")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
