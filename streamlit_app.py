@@ -41,13 +41,30 @@ st.markdown("""
     label, div[data-testid="stWidgetLabel"] {
         margin-bottom: 0px !important;
         padding-bottom: 2px !important;
-        font-size: 0.88rem !important;
+        font-size: 0.85rem !important;
     }
 
-    /* 모바일 및 PC 공통: 컬럼 간 좌우 여백 축소하여 한 줄에 맞춤 */
+    /* === 모바일 세로 화면에서도 st.columns 컬럼 강제 한 행(가로) 배치 === */
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 0.15rem !important;
+    }
+
+    /* 각 컬럼 패딩 축소 및 너비 자동 조절 */
     [data-testid="column"] {
-        padding-left: 2px !important;
-        padding-right: 2px !important;
+        padding-left: 1px !important;
+        padding-right: 1px !important;
+        min-width: 0 !important;
+    }
+
+    /* 모바일 세로화면 입력 박스 폰트 및 여백 최적화 */
+    div[data-baseweb="select"] > div, input {
+        font-size: 0.82rem !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
     }
 
     /* === PC 화면 전용 (769px 이상) === */
@@ -82,8 +99,8 @@ st.markdown("""
         .main .block-container {
             padding-top: 0.5rem !important;
             padding-bottom: 0.5rem !important;
-            padding-left: 0.3rem !important;
-            padding-right: 0.3rem !important;
+            padding-left: 0.2rem !important;
+            padding-right: 0.2rem !important;
             margin-top: 0rem !important;
         }
 
@@ -201,8 +218,8 @@ if engine:
                 
             with col2:
                 # 접수 일시 (날짜 | AM/PM | 시간 타이핑을 한 행에 구성)
-                st.markdown("<label style='font-size:0.88rem;'>접수 일시 *</label>", unsafe_allow_html=True)
-                t_col1, t_col2, t_col3 = st.columns([2.2, 1.2, 2.0])
+                st.markdown("<label style='font-size:0.85rem; font-weight:600;'>접수 일시 *</label>", unsafe_allow_html=True)
+                t_col1, t_col2, t_col3 = st.columns([2.3, 1.2, 2.0])
                 with t_col1:
                     order_date = st.date_input("접수 날짜", now_kst.date(), label_visibility="collapsed")
                 with t_col2:
@@ -213,8 +230,8 @@ if engine:
                     order_time_input = st.time_input("접수 시간", time(curr_12h, now_kst.minute), label_visibility="collapsed")
                 
                 # 픽업 일시 (날짜 | AM/PM | 시간 타이핑을 한 행에 구성)
-                st.markdown("<label style='font-size:0.88rem;'>픽업 일시 *</label>", unsafe_allow_html=True)
-                p_col1, p_col2, p_col3 = st.columns([2.2, 1.2, 2.0])
+                st.markdown("<label style='font-size:0.85rem; font-weight:600;'>픽업 일시 *</label>", unsafe_allow_html=True)
+                p_col1, p_col2, p_col3 = st.columns([2.3, 1.2, 2.0])
                 with p_col1:
                     pickup_date = st.date_input("픽업 날짜", now_kst.date(), label_visibility="collapsed")
                 with p_col2:
@@ -321,7 +338,7 @@ if engine:
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v19")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v20")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
@@ -379,8 +396,8 @@ if engine:
 
                             with col2:
                                 # 접수 일시
-                                st.markdown("<label style='font-size:0.88rem;'>접수 일시</label>", unsafe_allow_html=True)
-                                tc1, tc2, tc3 = st.columns([2.2, 1.2, 2.0])
+                                st.markdown("<label style='font-size:0.85rem; font-weight:600;'>접수 일시</label>", unsafe_allow_html=True)
+                                tc1, tc2, tc3 = st.columns([2.3, 1.2, 2.0])
                                 with tc1: edit_order_date = st.date_input("접수 날짜", value=c_cat.date(), label_visibility="collapsed")
                                 with tc2: edit_order_period = st.selectbox("접수 AM/PM", ["AM", "PM"], index=0 if c_cat.hour < 12 else 1, key="e_o_p_cal", label_visibility="collapsed")
                                 with tc3: 
@@ -389,8 +406,8 @@ if engine:
                                     edit_order_time_inp = st.time_input("접수 시간", value=time(c_h, c_cat.minute), key="e_o_t_cal", label_visibility="collapsed")
 
                                 # 픽업 일시
-                                st.markdown("<label style='font-size:0.88rem;'>픽업 일시</label>", unsafe_allow_html=True)
-                                pc1, pc2, pc3 = st.columns([2.2, 1.2, 2.0])
+                                st.markdown("<label style='font-size:0.85rem; font-weight:600;'>픽업 일시</label>", unsafe_allow_html=True)
+                                pc1, pc2, pc3 = st.columns([2.3, 1.2, 2.0])
                                 with pc1: edit_pickup_date = st.date_input("픽업 날짜", value=c_pdt.date(), label_visibility="collapsed")
                                 with pc2: edit_pickup_period = st.selectbox("픽업 AM/PM", ["AM", "PM"], index=0 if c_pdt.hour < 12 else 1, key="e_p_p_cal", label_visibility="collapsed")
                                 with pc3:
@@ -509,8 +526,8 @@ if engine:
 
                         with col2:
                             # 접수 일시
-                            st.markdown("<label style='font-size:0.88rem;'>접수 일시</label>", unsafe_allow_html=True)
-                            tc1, tc2, tc3 = st.columns([2.2, 1.2, 2.0])
+                            st.markdown("<label style='font-size:0.85rem; font-weight:600;'>접수 일시</label>", unsafe_allow_html=True)
+                            tc1, tc2, tc3 = st.columns([2.3, 1.2, 2.0])
                             with tc1: edit_order_date = st.date_input("접수 날짜", value=curr_cat.date(), label_visibility="collapsed")
                             with tc2: edit_order_period = st.selectbox("접수 AM/PM", ["AM", "PM"], index=0 if curr_cat.hour < 12 else 1, key="e_o_p_all", label_visibility="collapsed")
                             with tc3: 
@@ -519,8 +536,8 @@ if engine:
                                 edit_order_time_inp = st.time_input("접수 시간", value=time(c_h, curr_cat.minute), key="e_o_t_all", label_visibility="collapsed")
 
                             # 픽업 일시
-                            st.markdown("<label style='font-size:0.88rem;'>픽업 일시</label>", unsafe_allow_html=True)
-                            pc1, pc2, pc3 = st.columns([2.2, 1.2, 2.0])
+                            st.markdown("<label style='font-size:0.85rem; font-weight:600;'>픽업 일시</label>", unsafe_allow_html=True)
+                            pc1, pc2, pc3 = st.columns([2.3, 1.2, 2.0])
                             with pc1: edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date(), label_visibility="collapsed")
                             with pc2: edit_pickup_period = st.selectbox("픽업 AM/PM", ["AM", "PM"], index=0 if curr_pdt.hour < 12 else 1, key="e_p_p_all", label_visibility="collapsed")
                             with pc3:
