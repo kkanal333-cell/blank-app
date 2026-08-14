@@ -243,8 +243,15 @@ if engine:
             df_orders = pd.read_sql(query, engine)
             
             if not df_orders.empty:
-                df_orders['pickup_datetime'] = pd.to_datetime(df_orders['pickup_datetime']).dt.tz_localize('UTC', ambiguous='NaT', nonexistent='NaT').dt.tz_convert('Asia/Seoul')
-                df_orders['created_at'] = pd.to_datetime(df_orders['created_at']).dt.tz_localize('UTC', ambiguous='NaT', nonexistent='NaT').dt.tz_convert('Asia/Seoul')
+                def safe_to_kst(series):
+                    dt_series = pd.to_datetime(series, format='mixed', errors='coerce')
+                    if dt_series.dt.tz is None:
+                        return dt_series.dt.tz_localize('Asia/Seoul', ambiguous='NaT', nonexistent='NaT')
+                    else:
+                        return dt_series.dt.tz_convert('Asia/Seoul')
+
+                df_orders['pickup_datetime'] = safe_to_kst(df_orders['pickup_datetime'])
+                df_orders['created_at'] = safe_to_kst(df_orders['created_at'])
 
             def get_pastel_color(pm):
                 if pm == '네이버': return "#E0F2FE"
@@ -283,16 +290,15 @@ if engine:
                         "timeZone": "Asia/Seoul",
                         "selectable": True
                     }, 
-                    key="calendar_kst_v10"
+                    key="calendar_kst_v11"
                 )
                 
                 if cal_res:
                     if cal_res.get("dateClick"):
                         raw_date_str = cal_res["dateClick"]["date"]
-                        parsed_dt = pd.to_datetime(raw_date_str).tz_convert('Asia/Seoul')
+                        parsed_dt = pd.to_datetime(raw_date_str, format='mixed').tz_convert('Asia/Seoul')
                         kst_date_str = parsed_dt.strftime('%Y-%m-%d')
                         
-                        # 날짜를 새로 누르면 수정 폼 초기화 및 날짜 업데이트
                         if st.session_state.get("selected_calendar_date") != kst_date_str:
                             st.session_state["selected_calendar_date"] = kst_date_str
                             st.session_state["edit_order_id"] = None
@@ -315,7 +321,6 @@ if engine:
                     
                     if day_orders.empty:
                         st.info("해당 날짜에 픽업 예정인 주문이 없습니다.")
-                        # 주문 없는 날짜 선택 시 수정 폼 자동 닫기
                         if st.session_state.get("edit_order_id") is not None:
                             st.session_state["edit_order_id"] = None
                             st.rerun()
@@ -326,7 +331,6 @@ if engine:
                             'product_name': '상품명', 'amount': '금액', 'payment_method': '결제내역', 'memo': '메모'
                         })[['주문ID', '고객명', '연락처', '상품명', '금액', '픽업시각', '결제내역', '메모']]
                         
-                        # 다시 깔끔한 표준 dataframe 표 적용
                         day_event = st.dataframe(
                             day_display_df, 
                             use_container_width=True, 
