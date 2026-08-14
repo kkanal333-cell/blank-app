@@ -9,7 +9,6 @@ st.set_page_config(page_title="화사한 하루", layout="wide")
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
-# 세션에 주문 데이터가 없으면 빈 리스트로 초기화 (임의 데이터 제거)
 if 'orders' not in st.session_state:
     st.session_state.orders = []
 
@@ -113,8 +112,8 @@ with tab1:
         with c2: cust_phone = st.text_input("휴대폰 번호", value="010-")
         
         c3, c4 = st.columns(2)
-        with c3: prod_name = st.selectbox("주문 상품명 *", ["꽃다발", "꽃바구니", "기타"])
-        with c4: prod_price = st.number_input("결제 금액 (원)", value=55000)
+        with c3: prod_name = st.selectbox("주문 상품명 *", ["꽃다발", "꽃바구니", "용돈박스", "화분", "기타"])
+        with c4: prod_price = st.number_input("결제 금액 (원)", value=55000, step=5000)
         
         p1, p2, p3 = st.columns([2.2, 1, 1.4])
         with p1: p_date = st.date_input("픽업 일시 *", now_kst.date(), key="p_date")
@@ -140,7 +139,7 @@ with tab1:
                     "주문상품명": prod_name,
                     "결제금액": prod_price,
                     "픽업일자": str(p_date),
-                    "픽업시간": f"{p_period} {p_time.strftime('%H:%M')}",
+                    "픽업일시": f"{p_date} {p_period} {p_time.strftime('%H:%M')}",
                     "접수일시": f"{o_date} {o_time.strftime('%H:%M')}",
                     "결제내역": pay_method,
                     "메모": memo
@@ -154,7 +153,6 @@ with tab2:
     if st.session_state.orders:
         df_orders = pd.DataFrame(st.session_state.orders)
         
-        # 월간 캘린더 선택 기능
         col_y, col_m = st.columns(2)
         with col_y:
             sel_year = st.selectbox("연도 선택", [2025, 2026, 2027], index=1)
@@ -163,7 +161,6 @@ with tab2:
             
         st.write(f"### 📅 {sel_year}년 {sel_month}월 캘린더 뷰")
         
-        # 달력 생성
         cal = calendar.monthcalendar(sel_year, sel_month)
         week_days = ["월", "화", "수", "목", "금", "토", "일"]
         
@@ -179,7 +176,6 @@ with tab2:
                         st.write("")
                     else:
                         date_str = f"{sel_year}-{sel_month:02d}-{day:02d}"
-                        # 해당 날짜에 픽업이 있는지 확인
                         matched = df_orders[df_orders['픽업일자'] == date_str]
                         count = len(matched)
                         
