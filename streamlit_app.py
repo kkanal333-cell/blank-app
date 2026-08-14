@@ -254,7 +254,7 @@ if engine:
                 for _, row in df_orders.iterrows():
                     if pd.notnull(row['pickup_datetime']):
                         p_dt = pd.to_datetime(row['pickup_datetime'])
-                        pm = row['payment_method'] || "입금" # type: ignore
+                        pm = row['payment_method'] or "입금"
                         color = get_pastel_color(pm)
                         calendar_events.append({
                             "id": str(int(row['id'])),
@@ -268,7 +268,6 @@ if engine:
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
                     raw_date_str = cal_res["dateClick"]["date"]
-                    # [수정] UTC 변환으로 인한 하루 밀림 방지: 문자열의 앞 10자리(YYYY-MM-DD)를 직접 가져옴
                     clicked_date_str = str(raw_date_str)[:10]
                 elif cal_res and cal_res.get("eventClick"):
                     evt_start = cal_res["eventClick"]["event"]["start"]
