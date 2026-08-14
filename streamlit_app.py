@@ -1,10 +1,15 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, time
+import pytz
 from sqlalchemy import create_engine, text
 
-# 브라우저 탭 타이틀 변경
+# 브라우저 탭 타이틀
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리 시스템", layout="wide", page_icon="💐")
+
+# 대한민국 한국 표준시(KST) 설정 함수
+def get_kst_now():
+    return datetime.now(pytz.timezone('Asia/Seoul'))
 
 # DB 연결
 @st.cache_resource
@@ -45,7 +50,8 @@ if engine:
     if menu == "📝 신규 주문 및 고객 등록":
         st.header("📝 신규 주문 및 고객 등록")
         
-        now = datetime.now()
+        # 한국 표준시 기준 현재 시각
+        now_kst = get_kst_now()
         
         with st.form("order_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -56,15 +62,17 @@ if engine:
                 amount = st.number_input("결제 금액 (원)", min_value=0, step=1000, value=50000)
                 
             with col2:
+                # 📅 접수 날짜/시간 (한국 시각 기본 적용)
                 sub_col1, sub_col2 = st.columns(2)
                 with sub_col1:
-                    order_date = st.date_input("접수 날짜", now.date())
+                    order_date = st.date_input("접수 날짜", now_kst.date())
                 with sub_col2:
-                    order_time = st.time_input("접수 시간", now.time())
+                    order_time = st.time_input("접수 시간", now_kst.time())
                 
+                # 🚚 픽업/배송 날짜/시간
                 sub_col3, sub_col4 = st.columns(2)
                 with sub_col3:
-                    pickup_date = st.date_input("픽업 날짜", now.date())
+                    pickup_date = st.date_input("픽업 날짜", now_kst.date())
                 with sub_col4:
                     pickup_time = st.time_input("픽업 시간", time(14, 0))
                     
@@ -126,7 +134,6 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
-            # 한글 컬럼명으로 보여주기 위한 복사본
             display_df = df_orders.rename(columns={
                 'id': '주문ID',
                 'customer_name': '고객명',
@@ -149,8 +156,9 @@ if engine:
                 
                 selected_row = df_orders[df_orders['id'] == selected_id].iloc[0]
                 
-                curr_cat = pd.to_datetime(selected_row['created_at']) if pd.notnull(selected_row['created_at']) else datetime.now()
-                curr_pdt = pd.to_datetime(selected_row['pickup_datetime']) if pd.notnull(selected_row['pickup_datetime']) else datetime.now()
+                now_kst = get_kst_now()
+                curr_cat = pd.to_datetime(selected_row['created_at']) if pd.notnull(selected_row['created_at']) else now_kst
+                curr_pdt = pd.to_datetime(selected_row['pickup_datetime']) if pd.notnull(selected_row['pickup_datetime']) else now_kst
                 
                 with st.form("edit_order_form"):
                     col1, col2 = st.columns(2)
