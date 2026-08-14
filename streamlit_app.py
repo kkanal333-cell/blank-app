@@ -8,25 +8,10 @@ from streamlit_calendar import calendar
 # 페이지 기본 설정
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리", layout="wide", page_icon="💐")
 
-# 모바일 상단 여백 강제 제거 CSS
+# 모바일 화면 최적화를 위한 CSS (반응형 미디어 쿼리 포함)
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-
-    /* 상단 상단바(Header) 높이 및 패딩을 0에 가깝게 강제 제거 */
-    header[data-testid="stHeader"] {
-        height: 2rem !important;
-        background: transparent !important;
-    }
-    
-    /* 메인 컨테이너 최상단 여백 강제 제거 */
-    .main .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 1rem !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-        margin-top: -2rem !important;
-    }
 
     /* 아이콘 폰트 깨짐 방지 */
     [class*="material-symbols"], [class*="MaterialIcons"], i {
@@ -39,26 +24,66 @@ st.markdown("""
         color: #2D3748;
     }
 
-    /* 제목 크기 및 여백 극소화 */
-    h1 {
-        font-size: 1.25rem !important;
-        font-weight: 700 !important;
-        color: #582C83 !important;
-        margin-top: 0 !important;
-        margin-bottom: 0.3rem !important;
-        padding-top: 0 !important;
+    /* === 모바일 전용 극단적 여백 제거 (768px 이하) === */
+    @media (max-width: 768px) {
+        /* 상단 헤더 공간 및 패딩 완전히 제로화 */
+        header[data-testid="stHeader"] {
+            height: 0rem !important;
+            min-height: 0rem !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        /* 툴바/상단 바 여백 제거 */
+        [data-testid="stHeader"] > div {
+            padding: 0 !important;
+        }
+
+        /* 메인 컨테이너 최상단 패딩 제거 및 위치 끌어올리기 */
+        .main .block-container {
+            padding-top: 0.2rem !important;
+            padding-bottom: 0.5rem !important;
+            padding-left: 0.3rem !important;
+            padding-right: 0.3rem !important;
+            margin-top: -3.5rem !important; /* 상단 빈 공간 위로 강제 이동 */
+        }
+
+        /* 메인 타이틀(h1) 여백 완전히 붙이기 */
+        h1 {
+            font-size: 1.15rem !important;
+            font-weight: 700 !important;
+            color: #582C83 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0.2rem !important;
+            padding-top: 0 !important;
+            line-height: 1.2 !important;
+        }
+
+        h2 {
+            font-size: 1.0rem !important;
+            font-weight: 600 !important;
+            color: #4A5568 !important;
+            margin-top: 0.2rem !important;
+            margin-bottom: 0.2rem !important;
+        }
+
+        /* 폼 내부 여백 절반 축소 */
+        div[data-testid="stForm"] {
+            padding: 0.5rem !important;
+        }
+
+        /* 탭 간격 및 여백 축소 */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 2px !important;
+        }
     }
-    h2 {
-        font-size: 1.05rem !important;
-        font-weight: 600 !important;
-        color: #4A5568 !important;
-        margin-top: 0.3rem !important;
-        margin-bottom: 0.3rem !important;
-    }
-    
-    /* 폼/인풋 요소 간격 축소 */
-    div[data-testid="stForm"] {
-        padding: 0.8rem !important;
+
+    /* PC/기본 스타일 설정 */
+    @media (min-width: 769px) {
+        .main .block-container {
+            padding-top: 2rem !important;
+        }
     }
 
     /* 버튼 스타일 */
@@ -70,7 +95,7 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* 달력 헤더 축소 */
+    /* 달력 헤더 */
     .fc-toolbar-title {
         font-size: 0.95rem !important;
         font-weight: 700 !important;
@@ -249,7 +274,7 @@ if engine:
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v13")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v14")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
