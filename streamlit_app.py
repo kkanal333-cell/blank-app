@@ -11,14 +11,8 @@ st.set_page_config(page_title="화사한 하루 - 고객/주문 관리 시스템
 # 파스텔 / 보라 톤 CSS 스타일링
 st.markdown("""
 <style>
-    /* 메인 타이틀 파스텔 보라 포인트 */
-    h1 {
-        color: #6B46C1 !important;
-    }
-    h2, h3 {
-        color: #805AD5 !important;
-    }
-    /* 버튼 및 강조 요소 은은한 보라 스타일 */
+    h1 { color: #6B46C1 !important; }
+    h2, h3 { color: #805AD5 !important; }
     .stButton>button {
         border-radius: 8px;
         border: 1px solid #D6BCFA;
@@ -26,11 +20,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 대한민국 한국 표준시(KST) 설정
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
-# DB 연결
 @st.cache_resource
 def get_connection():
     try:
@@ -67,7 +59,6 @@ if engine:
     # 1. 신규 주문 및 고객 등록
     if menu == "📝 신규 주문 및 고객 등록":
         st.header("📝 신규 주문 및 고객 등록")
-        
         now_kst = get_kst_now()
         
         with st.form("order_form", clear_on_submit=True):
@@ -105,10 +96,10 @@ if engine:
                         with engine.connect() as conn:
                             res = conn.execute(text("SELECT id FROM customers WHERE name = :n AND phone = :p LIMIT 1"), {"n": customer_name, "p": phone}).fetchone()
                             if res:
-                                customer_id = res[0]
+                                customer_id = int(res[0])
                             else:
                                 ins_res = conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p) RETURNING id"), {"n": customer_name, "p": phone})
-                                customer_id = ins_res.fetchone()[0]
+                                customer_id = int(ins_res.fetchone()[0])
                             
                             conn.execute(text("""
                                 INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime, status, created_at)
@@ -117,7 +108,7 @@ if engine:
                                 "cid": customer_id,
                                 "pn": product_name,
                                 "p": product_name,
-                                "am": amount,
+                                "am": int(amount),
                                 "pdt": pickup_datetime,
                                 "st": status,
                                 "cat": order_datetime
@@ -149,20 +140,13 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
-            # 파스텔 톤 상태별 칼라 맵핑
             def get_pastel_color(status):
-                if status == '접수':
-                    return "#9FA8DA"  # 라벤더 블루
-                elif status == '제작중':
-                    return "#CE93D8"  # 소프트 퍼플/핑크
-                elif status == '배송중':
-                    return "#80DEEA"  # Soft 파스텔 민트
-                elif status == '완료':
-                    return "#A5D6A7"  # Soft 파스텔 그린
-                else:
-                    return "#B0BEC5"  # Soft 세이지 그레이
+                if status == '접수': return "#9FA8DA"
+                elif status == '제작중': return "#CE93D8"
+                elif status == '배송중': return "#80DEEA"
+                elif status == '완료': return "#A5D6A7"
+                else: return "#B0BEC5"
 
-            # 메뉴 내부 탭 분리
             tab1, tab2 = st.tabs(["📅 픽업 달력", "📊 전체 주문 목록"])
 
             # --- [TAB 1] 픽업 달력 ---
@@ -175,7 +159,7 @@ if engine:
                         p_dt = pd.to_datetime(row['pickup_datetime'])
                         color = get_pastel_color(row['status'])
                         calendar_events.append({
-                            "id": str(row['id']),
+                            "id": str(int(row['id'])),
                             "title": f"[{row['status']}] {row['customer_name']} - {row['product_name']}",
                             "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
                             "backgroundColor": color,
@@ -184,36 +168,22 @@ if engine:
                         })
                 
                 calendar_options = {
-                    "headerToolbar": {
-                        "left": "prev,next today",
-                        "center": "title",
-                        "right": ""
-                    },
+                    "headerToolbar": {"left": "prev,next today", "center": "title", "right": ""},
                     "initialView": "dayGridMonth",
                     "height": 620,
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v3")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v4")
                 
                 clicked_date_str = None
-                
-                # 1) 빈 공간 클릭시 (dateClick)
                 if cal_res and cal_res.get("dateClick"):
                     raw_date_str = cal_res["dateClick"]["date"]
-                    if "T" in raw_date_str:
-                        dt_obj = pd.to_datetime(raw_date_str).tz_convert("Asia/Seoul")
-                    else:
-                        dt_obj = pd.to_datetime(raw_date_str)
+                    dt_obj = pd.to_datetime(raw_date_str).tz_convert("Asia/Seoul") if "T" in raw_date_str else pd.to_datetime(raw_date_str)
                     clicked_date_str = dt_obj.strftime("%Y-%m-%d")
-                
-                # 2) 주문 내역 글씨 클릭시 (eventClick) -> 해당 주문의 픽업 날짜 파싱
                 elif cal_res and cal_res.get("eventClick"):
                     evt_start = cal_res["eventClick"]["event"]["start"]
-                    if "T" in evt_start:
-                        dt_obj = pd.to_datetime(evt_start).tz_convert("Asia/Seoul")
-                    else:
-                        dt_obj = pd.to_datetime(evt_start)
+                    dt_obj = pd.to_datetime(evt_start).tz_convert("Asia/Seoul") if "T" in evt_start else pd.to_datetime(evt_start)
                     clicked_date_str = dt_obj.strftime("%Y-%m-%d")
 
                 st.markdown("---")
@@ -227,27 +197,20 @@ if engine:
                     
                     if not day_orders.empty:
                         disp_day_df = day_orders.rename(columns={
-                            'id': '주문ID',
-                            'customer_name': '고객명',
-                            'phone': '연락처',
-                            'product_name': '상품명',
-                            'amount': '금액',
-                            'created_at': '접수일시',
-                            'pickup_datetime': '픽업일시',
-                            'status': '상태'
+                            'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
+                            'product_name': '상품명', 'amount': '금액', 'created_at': '접수일시',
+                            'pickup_datetime': '픽업일시', 'status': '상태'
                         }).drop(columns=['customer_id', 'pickup_date_only'], errors='ignore')
                         
                         st.dataframe(disp_day_df, use_container_width=True)
 
-                        # 달력 탭 하단 - 선택 일자 주문 수정/삭제 폼
                         st.markdown("---")
                         st.subheader(f"✏️ {clicked_date_str} 주문 수정 및 삭제")
                         
-                        day_order_ids = day_orders['id'].tolist()
+                        day_order_ids = [int(x) for x in day_orders['id'].tolist()]
                         chosen_cal_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", day_order_ids, key="cal_tab_selectbox")
                         
                         cal_selected_row = day_orders[day_orders['id'] == chosen_cal_id].iloc[0]
-                        
                         now_kst = get_kst_now()
                         c_cat = pd.to_datetime(cal_selected_row['created_at']) if pd.notnull(cal_selected_row['created_at']) else now_kst
                         c_pdt = pd.to_datetime(cal_selected_row['pickup_datetime']) if pd.notnull(cal_selected_row['pickup_datetime']) else now_kst
@@ -261,16 +224,11 @@ if engine:
                                 edit_amount = st.number_input("금액 (원)", min_value=0, step=1000, value=int(cal_selected_row['amount'] or 0))
                             with col2:
                                 sub_col1, sub_col2 = st.columns(2)
-                                with sub_col1:
-                                    edit_order_date = st.date_input("접수 날짜", value=c_cat.date())
-                                with sub_col2:
-                                    edit_order_time = st.time_input("접수 시간", value=c_cat.time())
-                                    
+                                with sub_col1: edit_order_date = st.date_input("접수 날짜", value=c_cat.date())
+                                with sub_col2: edit_order_time = st.time_input("접수 시간", value=c_cat.time())
                                 sub_col3, sub_col4 = st.columns(2)
-                                with sub_col3:
-                                    edit_pickup_date = st.date_input("픽업 날짜", value=c_pdt.date())
-                                with sub_col4:
-                                    edit_pickup_time = st.time_input("픽업 시간", value=c_pdt.time())
+                                with sub_col3: edit_pickup_date = st.date_input("픽업 날짜", value=c_pdt.date())
+                                with sub_col4: edit_pickup_time = st.time_input("픽업 시간", value=c_pdt.time())
                                 
                                 status_list = ["접수", "제작중", "배송중", "완료", "취소"]
                                 curr_status = cal_selected_row['status']
@@ -278,26 +236,24 @@ if engine:
                                 edit_status = st.selectbox("상태", status_list, index=curr_status_idx)
                             
                             btn_col1, btn_col2 = st.columns(2)
-                            with btn_col1:
-                                update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
-                            with btn_col2:
-                                delete_btn = st.form_submit_button("🗑️ 주문 삭제", use_container_width=True)
+                            with btn_col1: update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
+                            with btn_col2: delete_btn = st.form_submit_button("🗑️ 주문 삭제", use_container_width=True)
                             
                             if update_btn:
                                 try:
                                     edit_cat = datetime.combine(edit_order_date, edit_order_time)
                                     edit_pdt = datetime.combine(edit_pickup_date, edit_pickup_time)
-                                    cid = cal_selected_row['customer_id']
+                                    cid = int(cal_selected_row['customer_id']) if pd.notnull(cal_selected_row['customer_id']) else None
                                     
                                     with engine.connect() as conn:
-                                        if pd.notnull(cid):
+                                        if cid:
                                             conn.execute(text("UPDATE customers SET name=:n, phone=:p WHERE id=:id"), {"n": edit_name, "p": edit_phone, "id": cid})
                                         
                                         conn.execute(text("""
                                             UPDATE orders 
                                             SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, created_at=:cat
                                             WHERE id=:id
-                                        """), {"pn": edit_product, "am": edit_amount, "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": chosen_cal_id})
+                                        """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_cal_id)})
                                         conn.commit()
                                     st.success(f"{chosen_cal_id}번 주문이 성공적으로 수정되었습니다!")
                                     st.rerun()
@@ -307,7 +263,7 @@ if engine:
                             if delete_btn:
                                 try:
                                     with engine.connect() as conn:
-                                        conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": chosen_cal_id})
+                                        conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": int(chosen_cal_id)})
                                         conn.commit()
                                     st.warning(f"{chosen_cal_id}번 주문이 삭제되었습니다.")
                                     st.rerun()
@@ -323,36 +279,37 @@ if engine:
                 st.subheader("📊 전체 주문 목록")
                 
                 display_df = df_orders.rename(columns={
-                    'id': '주문ID',
-                    'customer_name': '고객명',
-                    'phone': '연락처',
-                    'product_name': '상품명',
-                    'amount': '금액',
-                    'created_at': '접수일시',
-                    'pickup_datetime': '픽업일시',
-                    'status': '상태'
+                    'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
+                    'product_name': '상품명', 'amount': '금액', 'created_at': '접수일시',
+                    'pickup_datetime': '픽업일시', 'status': '상태'
                 }).drop(columns=['customer_id'], errors='ignore')
                 
                 event = st.dataframe(
                     display_df, 
                     use_container_width=True,
                     selection_mode="single-row",
-                    on_select="rerun"
+                    on_select="rerun",
+                    key="all_orders_dataframe"
                 )
                 
                 selected_id = None
                 if event and event.get("selection") and event["selection"].get("rows"):
-                    selected_row_index = event["selection"]["rows"][0]
-                    if selected_row_index < len(df_orders):
-                        selected_id = df_orders.iloc[selected_row_index]['id']
+                    selected_row_indices = event["selection"]["rows"]
+                    if len(selected_row_indices) > 0:
+                        selected_row_index = selected_row_indices[0]
+                        if selected_row_index < len(df_orders):
+                            selected_id = int(df_orders.iloc[selected_row_index]['id'])
 
-                # 전체 주문 수정 및 삭제 폼
                 if not df_orders.empty:
                     st.markdown("---")
-                    st.subheader("✏️ 주문 수정 및 삭제")
                     
-                    order_ids = df_orders['id'].tolist()
+                    order_ids = [int(x) for x in df_orders['id'].tolist()]
                     default_index = order_ids.index(selected_id) if (selected_id is not None and selected_id in order_ids) else 0
+                    
+                    # 선택한 항목에 맞춰 제목 표시
+                    current_chosen_id = order_ids[default_index]
+                    st.subheader(f"✏️ [{current_chosen_id}번] 주문 수정 및 삭제")
+                    
                     chosen_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", order_ids, index=default_index, key="all_tab_selectbox")
                     
                     selected_row = df_orders[df_orders['id'] == chosen_id].iloc[0]
@@ -370,16 +327,11 @@ if engine:
                             edit_amount = st.number_input("금액 (원)", min_value=0, step=1000, value=int(selected_row['amount'] or 0))
                         with col2:
                             sub_col1, sub_col2 = st.columns(2)
-                            with sub_col1:
-                                edit_order_date = st.date_input("접수 날짜", value=curr_cat.date())
-                            with sub_col2:
-                                edit_order_time = st.time_input("접수 시간", value=curr_cat.time())
-                                
+                            with sub_col1: edit_order_date = st.date_input("접수 날짜", value=curr_cat.date())
+                            with sub_col2: edit_order_time = st.time_input("접수 시간", value=curr_cat.time())
                             sub_col3, sub_col4 = st.columns(2)
-                            with sub_col3:
-                                edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date())
-                            with sub_col4:
-                                edit_pickup_time = st.time_input("픽업 시간", value=curr_pdt.time())
+                            with sub_col3: edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date())
+                            with sub_col4: edit_pickup_time = st.time_input("픽업 시간", value=curr_pdt.time())
                             
                             status_list = ["접수", "제작중", "배송중", "완료", "취소"]
                             curr_status = selected_row['status']
@@ -387,26 +339,24 @@ if engine:
                             edit_status = st.selectbox("상태", status_list, index=curr_status_idx)
                         
                         btn_col1, btn_col2 = st.columns(2)
-                        with btn_col1:
-                            update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
-                        with btn_col2:
-                            delete_btn = st.form_submit_button("🗑️ 주문 삭제", use_container_width=True)
+                        with btn_col1: update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
+                        with btn_col2: delete_btn = st.form_submit_button("🗑️ 주문 삭제", use_container_width=True)
                         
                         if update_btn:
                             try:
                                 edit_cat = datetime.combine(edit_order_date, edit_order_time)
                                 edit_pdt = datetime.combine(edit_pickup_date, edit_pickup_time)
-                                cid = selected_row['customer_id']
+                                cid = int(selected_row['customer_id']) if pd.notnull(selected_row['customer_id']) else None
                                 
                                 with engine.connect() as conn:
-                                    if pd.notnull(cid):
+                                    if cid:
                                         conn.execute(text("UPDATE customers SET name=:n, phone=:p WHERE id=:id"), {"n": edit_name, "p": edit_phone, "id": cid})
                                     
                                     conn.execute(text("""
                                         UPDATE orders 
                                         SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, created_at=:cat
                                         WHERE id=:id
-                                    """), {"pn": edit_product, "am": edit_amount, "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": chosen_id})
+                                    """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_id)})
                                     conn.commit()
                                 st.success(f"{chosen_id}번 주문이 성공적으로 수정되었습니다!")
                                 st.rerun()
@@ -416,7 +366,7 @@ if engine:
                         if delete_btn:
                             try:
                                 with engine.connect() as conn:
-                                    conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": chosen_id})
+                                    conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": int(chosen_id)})
                                     conn.commit()
                                 st.warning(f"{chosen_id}번 주문이 삭제되었습니다.")
                                 st.rerun()
@@ -452,21 +402,13 @@ if engine:
     # 4. 알림 발송 현황
     elif menu == "🔔 알림 발송 현황":
         st.header("🔔 픽업/배송 알림 발송 현황")
-        
         try:
             query = """
                 SELECT 
-                    o.id as 주문ID,
-                    c.name as 고객명,
-                    c.phone as 연락처,
-                    o.product_name as 상품명,
-                    o.created_at as 접수일시,
-                    o.pickup_datetime as 픽업일시,
-                    o.status as 상태
-                FROM orders o
-                LEFT JOIN customers c ON o.customer_id = c.id
-                WHERE o.status NOT IN ('완료', '취소')
-                ORDER BY o.pickup_datetime ASC
+                    o.id as 주문ID, c.name as 고객명, c.phone as 연락처, o.product_name as 상품명,
+                    o.created_at as 접수일시, o.pickup_datetime as 픽업일시, o.status as 상태
+                FROM orders o LEFT JOIN customers c ON o.customer_id = c.id
+                WHERE o.status NOT IN ('완료', '취소') ORDER BY o.pickup_datetime ASC
             """
             df_upcoming = pd.read_sql(query, engine)
             st.subheader("📌 픽업/배송 대기 목록")
@@ -481,7 +423,6 @@ if engine:
     # 5. 데이터 CSV 백업
     elif menu == "📥 데이터 CSV 백업":
         st.header("📥 데이터 CSV 백업 (엑셀 저장)")
-        
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("1. 전체 주문 내역")
