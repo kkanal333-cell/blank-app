@@ -8,31 +8,34 @@ st.set_page_config(page_title="화사한 하루", layout="wide", initial_sidebar
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
-# 모바일에서 메뉴(radio 버튼)를 누르면 사이드바가 자동으로 닫히도록 처리하는 스크립트
-auto_close_sidebar_script = """
+# 모바일에서 메뉴 터치 시 사이드바가 확실히 닫히도록 개선된 스크립트
+mobile_auto_close_script = """
 <script>
-    function setupMobileSidebarClose() {
+    function handleMobileSidebar() {
         const doc = window.parent.document;
-        // 사이드바 내부의 라디오 버튼이나 라벨을 클릭했을 때
-        const radios = doc.querySelectorAll('[data-testid="stSidebar"] [data-baseweb="radio"]');
-        radios.forEach(radio => {
-            if (!radio.dataset.listenerAdded) {
-                radio.dataset.listenerAdded = 'true';
-                radio.addEventListener('click', () => {
-                    // 화면이 모바일 크기(예: 1024px 미만)일 때만 사이드바 토글 버튼을 시뮬레이션하여 닫음
-                    if (window.parent.innerWidth < 1024) {
-                        const toggleBtn = doc.querySelector('[data-testid="collapsedControl"]');
-                        if (toggleBtn) {
-                            toggleBtn.click();
-                        } else {
-                            // 대안으로 오버레이 영역 클릭 시도
-                            const overlay = doc.querySelector('[data-testid="stSidebarOverlay"]');
-                            if (overlay) overlay.click();
-                        }
+        // 모바일 화면(1024px 미만)일 때만 작동
+        if (window.parent.innerWidth < 1024) {
+            const sidebar = doc.querySelector('[data-testid="stSidebar"]');
+            if (sidebar) {
+                const radios = sidebar.querySelectorAll('label');
+                radios.forEach(label => {
+                    if (!label.dataset.mobileCloseBound) {
+                        label.dataset.mobileCloseBound = 'true';
+                        label.addEventListener('click', () => {
+                            setTimeout(() => {
+                                const closeBtn = doc.querySelector('[data-testid="collapsedControl"]');
+                                if (closeBtn) {
+                                    closeBtn.click();
+                                } else {
+                                    const overlay = doc.querySelector('[data-testid="stSidebarOverlay"]');
+                                    if (overlay) overlay.click();
+                                }
+                            }, 150);
+                        });
                     }
                 });
             }
-        });
+        }
         
         // 깨진 텍스트 정리
         const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
@@ -43,12 +46,12 @@ auto_close_sidebar_script = """
             }
         }
     }
-    const observer = new MutationObserver(setupMobileSidebarClose);
+    const observer = new MutationObserver(handleMobileSidebar);
     observer.observe(window.parent.document.body, { childList: true, subtree: true });
-    setInterval(setupMobileSidebarClose, 200);
+    setInterval(handleMobileSidebar, 200);
 </script>
 """
-components.html(auto_close_sidebar_script, height=0, width=0)
+components.html(mobile_auto_close_script, height=0, width=0)
 
 st.markdown("""
 <style>
