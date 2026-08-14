@@ -122,6 +122,12 @@ if engine:
     elif menu == "📋 전체 주문 목록 & 달력":
         st.header("📋 전체 주문 내역 및 픽업 달력")
         
+        # 수정 및 삭제 완료 메시지 세션 상태 처리
+        if "msg_success" in st.session_state:
+            st.success(st.session_state.pop("msg_success"))
+        if "msg_warning" in st.session_state:
+            st.warning(st.session_state.pop("msg_warning"))
+
         try:
             query = """
                 SELECT 
@@ -174,7 +180,7 @@ if engine:
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v4")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v5")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
@@ -255,7 +261,7 @@ if engine:
                                             WHERE id=:id
                                         """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_cal_id)})
                                         conn.commit()
-                                    st.success(f"{chosen_cal_id}번 주문이 성공적으로 수정되었습니다!")
+                                    st.session_state["msg_success"] = f"🎉 {chosen_cal_id}번 주문이 성공적으로 수정되었습니다!"
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"수정 실패: {e}")
@@ -265,7 +271,7 @@ if engine:
                                     with engine.connect() as conn:
                                         conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": int(chosen_cal_id)})
                                         conn.commit()
-                                    st.warning(f"{chosen_cal_id}번 주문이 삭제되었습니다.")
+                                    st.session_state["msg_warning"] = f"🗑️ {chosen_cal_id}번 주문이 삭제되었습니다."
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"삭제 실패: {e}")
@@ -284,6 +290,7 @@ if engine:
                     'pickup_datetime': '픽업일시', 'status': '상태'
                 }).drop(columns=['customer_id'], errors='ignore')
                 
+                # 데이터프레임 선택 이벤트 처리
                 event = st.dataframe(
                     display_df, 
                     use_container_width=True,
@@ -292,25 +299,32 @@ if engine:
                     key="all_orders_dataframe"
                 )
                 
-                selected_id = None
+                # 세션 상태로 선택 ID 직접 동기화
+                order_ids = [int(x) for x in df_orders['id'].tolist()]
+                
                 if event and event.get("selection") and event["selection"].get("rows"):
-                    selected_row_indices = event["selection"]["rows"]
-                    if len(selected_row_indices) > 0:
-                        selected_row_index = selected_row_indices[0]
-                        if selected_row_index < len(df_orders):
-                            selected_id = int(df_orders.iloc[selected_row_index]['id'])
+                    rows = event["selection"]["rows"]
+                    if len(rows) > 0:
+                        clicked_idx = rows[0]
+                        if clicked_idx < len(df_orders):
+                            new_sel_id = int(df_orders.iloc[clicked_idx]['id'])
+                            if st.session_state.get("all_tab_selectbox") != new_sel_id:
+                                st.session_state["all_tab_selectbox"] = new_sel_id
+                                st.rerun()
 
                 if not df_orders.empty:
                     st.markdown("---")
                     
-                    order_ids = [int(x) for x in df_orders['id'].tolist()]
-                    default_index = order_ids.index(selected_id) if (selected_id is not None and selected_id in order_ids) else 0
+                    if "all_tab_selectbox" not in st.session_state or st.session_state["all_tab_selectbox"] not in order_ids:
+                        st.session_state["all_tab_selectbox"] = order_ids[0]
                     
-                    # 선택한 항목에 맞춰 제목 표시
-                    current_chosen_id = order_ids[default_index]
-                    st.subheader(f"✏️ [{current_chosen_id}번] 주문 수정 및 삭제")
+                    chosen_id = st.selectbox(
+                        "수정 또는 삭제할 주문 번호(ID) 선택", 
+                        order_ids, 
+                        key="all_tab_selectbox"
+                    )
                     
-                    chosen_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", order_ids, index=default_index, key="all_tab_selectbox")
+                    st.subheader(f"✏️ [{chosen_id}번] 주문 수정 및 삭제")
                     
                     selected_row = df_orders[df_orders['id'] == chosen_id].iloc[0]
                     
@@ -358,7 +372,7 @@ if engine:
                                         WHERE id=:id
                                     """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_id)})
                                     conn.commit()
-                                st.success(f"{chosen_id}번 주문이 성공적으로 수정되었습니다!")
+                                st.session_state["msg_success"] = f"🎉 {chosen_id}번 주문 수정이 완료되었습니다!"
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"수정 실패: {e}")
@@ -368,7 +382,7 @@ if engine:
                                 with engine.connect() as conn:
                                     conn.execute(text("DELETE FROM orders WHERE id=:id"), {"id": int(chosen_id)})
                                     conn.commit()
-                                st.warning(f"{chosen_id}번 주문이 삭제되었습니다.")
+                                st.session_state["msg_warning"] = f"🗑️ {chosen_id}번 주문이 삭제되었습니다."
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"삭제 실패: {e}")
