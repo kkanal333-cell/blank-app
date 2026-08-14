@@ -545,3 +545,48 @@ elif menu == "📥 데이터 백업 (CSV)":
                 st.info("등록된 고객 정보가 없습니다.")
         except Exception as e:
             st.error(f"고객 데이터 불러오기 오류: {e}")
+
+# ==========================================
+# 데이터 CSV 백업 기능
+# ==========================================
+st.sidebar.markdown("---")
+if st.sidebar.button("📥 데이터 CSV 백업 (엑셀 저장)", use_container_width=True):
+    st.subheader("📥 데이터 CSV 백업")
+    st.write("데이터베이스에 저장된 모든 데이터를 엑셀(CSV)로 저장합니다.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("##### 1. 전체 주문 내역 백업")
+        try:
+            df_orders = pd.read_sql("SELECT * FROM orders ORDER BY id DESC", engine)
+            if not df_orders.empty:
+                csv_orders = df_orders.to_csv(index=False, encoding='utf-8-sig')
+                st.download_button(
+                    label="📥 주문 내역 CSV 다운로드",
+                    data=csv_orders,
+                    file_name="flower_orders_backup.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            else:
+                st.info("등록된 주문 내역이 없습니다.")
+        except Exception as e:
+            st.error(f"주문 데이터 불러오기 실패: {e}")
+
+    with col2:
+        st.write("##### 2. 전체 고객 목록 백업")
+        try:
+            df_customers = pd.read_sql("SELECT * FROM customers ORDER BY id DESC", engine)
+            if not df_customers.empty:
+                csv_customers = df_customers.to_csv(index=False, encoding='utf-8-sig')
+                st.download_button(
+                    label="📥 고객 목록 CSV 다운로드",
+                    data=csv_customers,
+                    file_name="flower_customers_backup.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            else:
+                st.info("등록된 고객 정보가 없습니다.")
+        except Exception as e:
+            st.error(f"고객 데이터 불러오기 실패: {e}")
