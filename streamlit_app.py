@@ -155,7 +155,7 @@ with st.sidebar:
     st.title("📌 메뉴")
     menu = st.radio("이동할 메뉴를 선택하세요", menu_options, key="sidebar_main_menu")
 
-# 달력 + 상호작용 리스트 영역 부분 리프레시 Fragment
+# 달력 + 하단 표 + 수정폼 세션을 안전하게 랜더링하는 Fragment
 @st.fragment
 def render_calendar_section(df_orders):
     def get_pastel_color(pm):
@@ -186,6 +186,9 @@ def render_calendar_section(df_orders):
                     "backgroundColor": color, "borderColor": color, "textColor": "#2D3748"
                 })
         
+        # 달력 사라짐 방지를 위해 key에 날짜 상태를 안전하게 결합
+        sel_date_key_part = st.session_state.get("selected_calendar_date") or "none"
+        
         cal_res = calendar(
             events=calendar_events, 
             options={
@@ -195,7 +198,7 @@ def render_calendar_section(df_orders):
                 "timeZone": "Asia/Seoul",
                 "selectable": True
             }, 
-            key="calendar_kst_v14"
+            key=f"main_pickup_calendar_{sel_date_key_part}"
         )
         
         if cal_res:
@@ -233,15 +236,13 @@ def render_calendar_section(df_orders):
             else:
                 day_orders['픽업시각'] = day_orders['pickup_datetime'].dt.strftime('%p %I:%M').replace({'AM': '오전', 'PM': '오후'}, regex=True)
                 
-                # 깔끔한 테이블 보기용 DataFrame 구성
                 day_display = day_orders.rename(columns={
                     'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
                     'product_name': '상품명', 'amount': '금액', 'payment_method': '결제내역', 'memo': '메모'
                 })[['주문ID', '고객명', '연락처', '상품명', '금액', '픽업시각', '결제내역', '메모']]
                 
-                st.caption("💡 수정하려는 행 왼쪽의 **네모 선택상자** 또는 **행 내부**를 클릭하세요.")
+                st.caption("💡 수정하려는 주문의 행 또는 선택 체크박스를 클릭하세요.")
                 
-                # 선택 박스가 선명하게 포함된 테이블
                 day_event = st.dataframe(
                     day_display, 
                     use_container_width=True, 
