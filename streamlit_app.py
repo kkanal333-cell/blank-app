@@ -8,38 +8,37 @@ from streamlit_calendar import calendar
 # 페이지 기본 설정
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리", layout="wide", page_icon="💐")
 
-# 간판 느낌의 고급스럽고 세련된 디자인 Custom CSS
+# 세련된 Pretendard 고딕 폰트 및 소프트 파스텔 CSS 적용
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-    @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');
 
-    /* 전체 기본 폰트 적용 */
-    html, body, [class*="css"], .stMarkdown, p, div, span, button, input {
-        font-family: 'Gowun Dodum', 'Pretendard', sans-serif !important;
-        color: #333333;
+    /* 깔끔한 모던 고딕 폰트 전면 적용 */
+    html, body, [class*="css"], .stMarkdown, p, div, span, button, input, select {
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif !important;
+        color: #2D3748;
     }
 
-    /* 제목 크기 대폭 축소 및 간판 스타일 포인트 컬러 */
+    /* 제목 크기 단정하게 축소 */
     h1 {
-        font-size: 1.6rem !important;
+        font-size: 1.5rem !important;
         font-weight: 700 !important;
-        color: #582C83 !important; /* 간판 딥 퍼플 */
+        color: #582C83 !important; /* 간판 딥 퍼플 포인트 */
         margin-bottom: 0.8rem !important;
     }
     h2 {
-        font-size: 1.25rem !important;
+        font-size: 1.2rem !important;
         font-weight: 600 !important;
-        color: #4A5568 !important; /* 차분한 다크 그레이 */
-        margin-top: 1rem !important;
+        color: #4A5568 !important;
+        margin-top: 0.8rem !important;
     }
     h3 {
-        font-size: 1.05rem !important;
+        font-size: 1.0rem !important;
         font-weight: 600 !important;
         color: #4A5568 !important;
     }
 
-    /* 버튼 스타일 - 소프트 파스텔 퍼플 */
+    /* 소프트 파스텔 버튼 스타일 */
     .stButton>button {
         border-radius: 8px !important;
         background-color: #F3EEF9 !important;
@@ -54,7 +53,7 @@ st.markdown("""
         color: #3D1C5C !important;
     }
 
-    /* 달력 커스텀 (빨간색 / 강한 원색 전면 제거, 은은한 파스텔 톤 적용) */
+    /* 달력 커스텀 (빨간색/원색 제거, 은은한 파스텔 톤) */
     .fc-button-primary {
         background-color: #F3EEF9 !important;
         border-color: #E2D5F1 !important;
@@ -68,13 +67,8 @@ st.markdown("""
         border-color: #D1BCED !important;
         color: #3D1C5C !important;
     }
-    .fc-button-primary:disabled {
-        background-color: #F7F7F7 !important;
-        border-color: #EAEAEA !important;
-        color: #AAAAAA !important;
-    }
     .fc-toolbar-title {
-        font-size: 1.15rem !important;
+        font-size: 1.1rem !important;
         font-weight: 700 !important;
         color: #4A5568 !important;
     }
@@ -82,21 +76,14 @@ st.markdown("""
         border-color: #EDF2F7 !important;
     }
     .fc-day-today {
-        background-color: #FAF5FF !important; /* 오늘 날짜 매우 연한 파스텔 보라 배경 */
+        background-color: #FAF5FF !important;
     }
     
-    /* 탭 디자인 강화 */
+    /* 탭 스타일 */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 6px 6px 0px 0px;
-        padding: 8px 16px;
-        background-color: #F7FAFC;
-        color: #718096;
-    }
     .stTabs [aria-selected="true"] {
-        background-color: #FFFFFF !important;
         color: #582C83 !important;
         font-weight: bold;
         border-bottom: 2px solid #582C83 !important;
@@ -127,17 +114,22 @@ engine = get_connection()
 
 st.title("💐 화사한 하루 고객 & 주문 관리")
 
+# 메뉴 목록 정의
+menu_options = [
+    "📝 신규 주문 및 고객 등록", 
+    "📋 전체 주문 목록 & 달력", 
+    "🎂 고객 관리", 
+    "🔔 알림 발송 현황", 
+    "📥 데이터 CSV 백업"
+]
+
+# 모바일에서도 메뉴가 잘 보이도록 상단 드롭다운 배치 + 사이드바 연동
 st.sidebar.title("📌 메뉴")
-menu = st.sidebar.radio(
-    "메뉴 선택", 
-    [
-        "📝 신규 주문 및 고객 등록", 
-        "📋 전체 주문 목록 & 달력", 
-        "🎂 고객 관리", 
-        "🔔 알림 발송 현황", 
-        "📥 데이터 CSV 백업"
-    ]
-)
+sidebar_menu = st.sidebar.radio("메뉴 선택", menu_options, key="sb_menu")
+
+# 화면 상단 모바일/PC 공용 네비게이션 드롭다운
+selected_index = menu_options.index(sidebar_menu) if sidebar_menu in menu_options else 0
+menu = st.selectbox("📱 메뉴 바로가기 (모바일용)", menu_options, index=selected_index, key="top_menu_select")
 
 if engine:
     # 1. 신규 주문 및 고객 등록
@@ -198,7 +190,7 @@ if engine:
                                 "cat": order_datetime
                             })
                             conn.commit()
-                        st.success(f"'{customer_name}'님의 주문이 저장되었습니다.")
+                        st.success(f"'{customer_name}'님의 주문이 성공적으로 저장되었습니다!")
                     except Exception as e:
                         st.error(f"저장 실패: {e}")
 
@@ -224,19 +216,18 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
-            # 은은한 고급 파스텔 라벨 색상 설정
             def get_pastel_color(status):
-                if status == '접수': return "#E2E8F0"      # 파스텔 쿨그레이
-                elif status == '제작중': return "#E9D8FD"    # 파스텔 퍼플
-                elif status == '배송중': return "#E0F2FE"    # 파스텔 스카이블루
-                elif status == '완료': return "#DCFCE7"      # 파스텔 민트/그린
+                if status == '접수': return "#E2E8F0"
+                elif status == '제작중': return "#E9D8FD"
+                elif status == '배송중': return "#E0F2FE"
+                elif status == '완료': return "#DCFCE7"
                 else: return "#F1F5F9"
 
             tab1, tab2 = st.tabs(["📅 픽업 달력", "📊 전체 주문 목록"])
 
             # --- [TAB 1] 픽업 달력 ---
             with tab1:
-                st.caption("💡 달력 날짜나 주문을 클릭하면 상세 내역 조회가 가능합니다.")
+                st.caption("💡 달력 날짜나 주문을 터치하시면 해당 날짜의 픽업 주문 리스트가 나타납니다.")
                 
                 calendar_events = []
                 for _, row in df_orders.iterrows():
@@ -255,11 +246,11 @@ if engine:
                 calendar_options = {
                     "headerToolbar": {"left": "prev,next today", "center": "title", "right": ""},
                     "initialView": "dayGridMonth",
-                    "height": 620,
+                    "height": 580,
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v7")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v8")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
@@ -355,7 +346,7 @@ if engine:
                     else:
                         st.info(f"{clicked_date_str}에는 예정된 픽업 주문이 없습니다.")
                 else:
-                    st.info("👆 달력에서 특정 날짜나 주문을 클릭해 보세요.")
+                    st.info("👆 달력에서 특정 날짜나 주문을 선택해 보세요.")
 
             # --- [TAB 2] 전체 주문 목록 및 수정/삭제 ---
             with tab2:
@@ -506,7 +497,7 @@ if engine:
         except Exception as e:
             st.error(f"알림 현황 조회 실패: {e}")
 
-    # 5. 데이터 CSV 백업
+    # 5. 데이터 CSV 백업 (한글 깨짐 방지 utf-8-sig 인코딩)
     elif menu == "📥 데이터 CSV 백업":
         st.header("📥 데이터 CSV 백업 (엑셀 저장)")
         col1, col2 = st.columns(2)
@@ -514,12 +505,13 @@ if engine:
             st.subheader("1. 전체 주문 내역")
             try:
                 df_orders = pd.read_sql("""
-                    SELECT o.id, c.name as customer_name, c.phone, o.product_name, o.amount, o.created_at as order_datetime, o.pickup_datetime, o.status
+                    SELECT o.id as 주문ID, c.name as 고객명, c.phone as 연락처, o.product_name as 상품명, o.amount as 결제금액, o.created_at as 접수일시, o.pickup_datetime as 픽업일시, o.status as 상태
                     FROM orders o LEFT JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC
                 """, engine)
                 if not df_orders.empty:
-                    csv_orders = df_orders.to_csv(index=False, encoding='utf-8-sig')
-                    st.download_button("📥 주문 내역 엑셀다운로드", data=csv_orders, file_name="hasahan_orders_backup.csv", mime="text/csv", use_container_width=True)
+                    # utf-8-sig 인코딩으로 엑셀 한글 깨짐 완전 방지
+                    csv_orders = df_orders.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+                    st.download_button("📥 주문 내역 엑셀다운로드", data=csv_orders, file_name="화사한하루_주문내역백업.csv", mime="text/csv", use_container_width=True)
                 else:
                     st.info("등록된 주문 내역이 없습니다.")
             except Exception as e:
@@ -528,10 +520,11 @@ if engine:
         with col2:
             st.subheader("2. 전체 고객 목록")
             try:
-                df_customers = pd.read_sql("SELECT * FROM customers ORDER BY id DESC", engine)
+                df_customers = pd.read_sql("SELECT id as ID, name as 고객명, phone as 연락처 FROM customers ORDER BY id DESC", engine)
                 if not df_customers.empty:
-                    csv_customers = df_customers.to_csv(index=False, encoding='utf-8-sig')
-                    st.download_button("📥 고객 목록 엑셀다운로드", data=csv_customers, file_name="hasahan_customers_backup.csv", mime="text/csv", use_container_width=True)
+                    # utf-8-sig 인코딩 적용
+                    csv_customers = df_customers.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+                    st.download_button("📥 고객 목록 엑셀다운로드", data=csv_customers, file_name="화사한하루_고객목록백업.csv", mime="text/csv", use_container_width=True)
                 else:
                     st.info("등록된 고객 정보가 없습니다.")
             except Exception as e:
