@@ -8,34 +8,44 @@ st.set_page_config(page_title="화사한 하루", layout="wide")
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
-# 자바스크립트로 깨진 텍스트 엘리먼트를 실시간 감지하여 영구 제거
-remove_bug_script = """
+# 버튼 기능은 유지하되 깨진 텍스트만 지우고 화살표 아이콘 부여
+fix_toggle_script = """
 <script>
-    function removeBrokenText() {
+    function fixToggle() {
         const doc = window.parent.document;
         const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
         let node;
         while (node = walker.nextNode()) {
             if (node.nodeValue && node.nodeValue.includes('keyboard_double')) {
-                node.nodeValue = '';
-                if (node.parentElement) {
-                    node.parentElement.style.display = 'none';
-                }
+                node.nodeValue = ''; // 글씨만 깔끔하게 지움
             }
         }
     }
-    const observer = new MutationObserver(removeBrokenText);
+    const observer = new MutationObserver(fixToggle);
     observer.observe(window.parent.document.body, { childList: true, subtree: true });
-    setInterval(removeBrokenText, 100);
+    setInterval(fixToggle, 100);
 </script>
 """
-components.html(remove_bug_script, height=0, width=0)
+components.html(fix_toggle_script, height=0, width=0)
 
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     
     * { font-family: 'Pretendard', sans-serif !important; }
+
+    /* 사이드바 토글 버튼이 정상 작동하도록 보이게 하되 깨진 글씨 영역 조정 */
+    [data-testid="collapsedControl"] {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    [data-testid="collapsedControl"] svg {
+        fill: #582C83 !important;
+        width: 24px !important;
+        height: 24px !important;
+        display: block !important;
+    }
 
     /* 제목 글씨 크기 및 위치 정돈 */
     .app-title {
