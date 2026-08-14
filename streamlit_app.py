@@ -122,9 +122,20 @@ def get_connection():
 
 engine = get_connection()
 
+# 필요한 칼럼(payment_method, memo) 자동 추가 체크
+if engine:
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);"))
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS memo TEXT;"))
+            conn.commit()
+    except Exception as e:
+        pass
+
 st.title("💐 화사한 하루 고객 & 주문 관리")
 
-# 메뉴 목록 정의
+PAYMENT_OPTIONS = ["네이버", "전화", "입금", "현금", "미결제"]
+
 menu_options = [
     "📝 신규 주문 및 고객 등록", 
     "📋 전체 주문 목록 & 달력", 
@@ -133,7 +144,6 @@ menu_options = [
     "📥 데이터 CSV 백업"
 ]
 
-# 좌측 사이드바 전용 라디오 버튼 메뉴
 with st.sidebar:
     st.title("📌 메뉴")
     menu = st.radio("이동할 메뉴를 선택하세요", menu_options, key="sidebar_main_menu")
@@ -165,7 +175,9 @@ if engine:
                 with sub_col4:
                     pickup_time = st.time_input("픽업 시간", time(14, 0))
                     
-                status = st.selectbox("상태", ["접수", "제작중", "배송중", "완료", "취소"])
+                payment_method = st.selectbox("결제내역 *", PAYMENT_OPTIONS)
+            
+            memo = st.text_area("고객 요구사항 / 메모", placeholder="요구사항이나 특이사항을 적어주세요.")
             
             submit = st.form_submit_button("🌸 주문 저장하기", use_container_width=True)
             if submit:
@@ -185,15 +197,17 @@ if engine:
                                 customer_id = int(ins_res.fetchone()[0])
                             
                             conn.execute(text("""
-                                INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime, status, created_at)
-                                VALUES (:cid, :pn, :p, :am, :pdt, :st, :cat)
+                                INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime, status, payment_method, memo, created_at)
+                                VALUES (:cid, :pn, :p, :am, :pdt, :st, :pm, :memo, :cat)
                             """), {
                                 "cid": customer_id,
                                 "pn": product_name,
                                 "p": product_name,
                                 "am": int(amount),
                                 "pdt": pickup_datetime,
-                                "st": status,
+                                "st": payment_method,
+                                "pm": payment_method,
+                                "memo": memo,
                                 "cat": order_datetime
                             })
                             conn.commit()
@@ -215,7 +229,8 @@ if engine:
                     o.amount as amount,
                     o.created_at as created_at,
                     o.pickup_datetime as pickup_datetime,
-                    o.status as status,
+                    COALESCE(o.payment_method, o.status, '입금') as payment_method,
+                    o.memo as memo,
                     o.customer_id as customer_id
                 FROM orders o
                 LEFT JOIN customers c ON o.customer_id = c.id
@@ -223,12 +238,12 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
-            def get_pastel_color(status):
-                if status == '접수': return "#E2E8F0"
-                elif status == '제작중': return "#E9D8FD"
-                elif status == '배송중': return "#E0F2FE"
-                elif status == '완료': return "#DCFCE7"
-                else: return "#F1F5F9"
+            def get_pastel_color(pm):
+                if pm == '네이버': return "#E0F2FE"
+                elif pm == '전화': return "#E9D8FD"
+                elif pm == '입금': return "#DCFCE7"
+                elif pm == '현금': return "#FEF08A"
+                else: return "#FEE2E2"
 
             tab1, tab2 = st.tabs(["📅 픽업 달력", "📊 전체 주문 목록"])
 
@@ -240,10 +255,11 @@ if engine:
                 for _, row in df_orders.iterrows():
                     if pd.notnull(row['pickup_datetime']):
                         p_dt = pd.to_datetime(row['pickup_datetime'])
-                        color = get_pastel_color(row['status'])
+                        pm = row['payment_method'] or "입금"
+                        color = get_pastel_color(pm)
                         calendar_events.append({
                             "id": str(int(row['id'])),
-                            "title": f"[{row['status']}] {row['customer_name']} - {row['product_name']}",
+                            "title": f"[{pm}] {row['customer_name']} - {row['product_name']}",
                             "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
                             "backgroundColor": color,
                             "borderColor": color,
@@ -257,7 +273,7 @@ if engine:
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v10")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v11")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
@@ -282,7 +298,7 @@ if engine:
                         disp_day_df = day_orders.rename(columns={
                             'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
                             'product_name': '상품명', 'amount': '금액', 'created_at': '접수일시',
-                            'pickup_datetime': '픽업일시', 'status': '상태'
+                            'pickup_datetime': '픽업일시', 'payment_method': '결제내역', 'memo': '메모'
                         }).drop(columns=['customer_id', 'pickup_date_only'], errors='ignore')
                         
                         st.dataframe(disp_day_df, use_container_width=True)
@@ -313,10 +329,11 @@ if engine:
                                 with sub_col3: edit_pickup_date = st.date_input("픽업 날짜", value=c_pdt.date())
                                 with sub_col4: edit_pickup_time = st.time_input("픽업 시간", value=c_pdt.time())
                                 
-                                status_list = ["접수", "제작중", "배송중", "완료", "취소"]
-                                curr_status = cal_selected_row['status']
-                                curr_status_idx = status_list.index(curr_status) if curr_status in status_list else 0
-                                edit_status = st.selectbox("상태", status_list, index=curr_status_idx)
+                                curr_pm = cal_selected_row['payment_method']
+                                curr_pm_idx = PAYMENT_OPTIONS.index(curr_pm) if curr_pm in PAYMENT_OPTIONS else 0
+                                edit_pm = st.selectbox("결제내역", PAYMENT_OPTIONS, index=curr_pm_idx)
+                            
+                            edit_memo = st.text_area("고객 요구사항 / 메모", value=str(cal_selected_row['memo'] or ""))
                             
                             btn_col1, btn_col2 = st.columns(2)
                             with btn_col1: update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
@@ -334,9 +351,9 @@ if engine:
                                         
                                         conn.execute(text("""
                                             UPDATE orders 
-                                            SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, created_at=:cat
+                                            SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, payment_method=:pm, memo=:memo, created_at=:cat
                                             WHERE id=:id
-                                        """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_cal_id)})
+                                        """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_pm, "pm": edit_pm, "memo": edit_memo, "cat": edit_cat, "id": int(chosen_cal_id)})
                                         conn.commit()
                                     st.success(f"수정이 완료되었습니다. ({chosen_cal_id}번 주문)")
                                     st.rerun()
@@ -364,7 +381,7 @@ if engine:
                 display_df = df_orders.rename(columns={
                     'id': '주문ID', 'customer_name': '고객명', 'phone': '연락처',
                     'product_name': '상품명', 'amount': '금액', 'created_at': '접수일시',
-                    'pickup_datetime': '픽업일시', 'status': '상태'
+                    'pickup_datetime': '픽업일시', 'payment_method': '결제내역', 'memo': '메모'
                 }).drop(columns=['customer_id'], errors='ignore')
                 
                 event = st.dataframe(
@@ -422,10 +439,11 @@ if engine:
                             with sub_col3: edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date())
                             with sub_col4: edit_pickup_time = st.time_input("픽업 시간", value=curr_pdt.time())
                             
-                            status_list = ["접수", "제작중", "배송중", "완료", "취소"]
-                            curr_status = selected_row['status']
-                            curr_status_idx = status_list.index(curr_status) if curr_status in status_list else 0
-                            edit_status = st.selectbox("상태", status_list, index=curr_status_idx)
+                            curr_pm = selected_row['payment_method']
+                            curr_pm_idx = PAYMENT_OPTIONS.index(curr_pm) if curr_pm in PAYMENT_OPTIONS else 0
+                            edit_pm = st.selectbox("결제내역", PAYMENT_OPTIONS, index=curr_pm_idx)
+                        
+                        edit_memo = st.text_area("고객 요구사항 / 메모", value=str(selected_row['memo'] or ""))
                         
                         btn_col1, btn_col2 = st.columns(2)
                         with btn_col1: update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
@@ -443,9 +461,9 @@ if engine:
                                     
                                     conn.execute(text("""
                                         UPDATE orders 
-                                        SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, created_at=:cat
+                                        SET product_name=:pn, product=:pn, amount=:am, pickup_datetime=:pdt, status=:st, payment_method=:pm, memo=:memo, created_at=:cat
                                         WHERE id=:id
-                                    """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_status, "cat": edit_cat, "id": int(chosen_id)})
+                                    """), {"pn": edit_product, "am": int(edit_amount), "pdt": edit_pdt, "st": edit_pm, "pm": edit_pm, "memo": edit_memo, "cat": edit_cat, "id": int(chosen_id)})
                                     conn.commit()
                                 st.success("수정이 완료되었습니다.")
                                 st.rerun()
@@ -480,7 +498,6 @@ if engine:
                     conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p)"), {"n": name, "p": phone})
                     conn.commit()
                 st.success(f"'{name}' 고객님이 등록되었습니다!")
-                st.rerun()
                 
         try:
             df_customers = pd.read_sql("SELECT id as ID, name as 고객명, phone as 연락처 FROM customers ORDER BY id DESC", engine)
@@ -495,16 +512,16 @@ if engine:
             query = """
                 SELECT 
                     o.id as 주문ID, c.name as 고객명, c.phone as 연락처, o.product_name as 상품명,
-                    o.created_at as 접수일시, o.pickup_datetime as 픽업일시, o.status as 상태
+                    o.created_at as 접수일시, o.pickup_datetime as 픽업일시, COALESCE(o.payment_method, o.status) as 결제내역, o.memo as 메모
                 FROM orders o LEFT JOIN customers c ON o.customer_id = c.id
-                WHERE o.status NOT IN ('완료', '취소') ORDER BY o.pickup_datetime ASC
+                ORDER BY o.pickup_datetime ASC
             """
             df_upcoming = pd.read_sql(query, engine)
-            st.subheader("📌 픽업/배송 대기 목록")
+            st.subheader("📌 전체 픽업/배송 알림 현황")
             if not df_upcoming.empty:
                 st.dataframe(df_upcoming, use_container_width=True)
             else:
-                st.info("현재 대기 중인 픽업/배송 알림이 없습니다.")
+                st.info("현재 등록된 픽업/배송 주문이 없습니다.")
             st.info("💡 카카오 알림톡(솔라피) 연동 대기 중입니다.")
         except Exception as e:
             st.error(f"알림 현황 조회 실패: {e}")
@@ -523,7 +540,8 @@ if engine:
                 try:
                     df_orders = pd.read_sql("""
                         SELECT o.id as 주문ID, c.name as 고객명, c.phone as 연락처, o.product_name as 상품명, 
-                               o.amount as 결제금액, o.created_at as 접수일시, o.pickup_datetime as 픽업일시, o.status as 상태
+                               o.amount as 결제금액, o.created_at as 접수일시, o.pickup_datetime as 픽업일시, 
+                               COALESCE(o.payment_method, o.status) as 결제내역, o.memo as 메모
                         FROM orders o LEFT JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC
                     """, engine)
                     if not df_orders.empty:
@@ -567,13 +585,14 @@ if engine:
                             if upload_type == "고객 목록 CSV":
                                 for _, row in df_upload.iterrows():
                                     c_name = str(row.get('고객명', '')).strip()
-                                    c_phone = str(row.get('연락처', '')).strip()
+                                    c_phone = str(row.get('연락처', '')).strip() if pd.notnull(row.get('연락처')) else ""
                                     if c_name and c_name != 'nan':
                                         res = conn.execute(text("SELECT id FROM customers WHERE name=:n AND phone=:p LIMIT 1"), {"n": c_name, "p": c_phone}).fetchone()
                                         if not res:
                                             conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p)"), {"n": c_name, "p": c_phone})
                                             success_cnt += 1
                                 conn.commit()
+                                st.success(f"🎉 총 {success_cnt}명의 신규 고객 데이터가 추가되었습니다!")
 
                             elif upload_type == "주문 내역 CSV":
                                 for _, row in df_upload.iterrows():
@@ -590,19 +609,24 @@ if engine:
                                             cid = int(ins_res.fetchone()[0])
                                         
                                         amount = int(row.get('결제금액', 0)) if pd.notnull(row.get('결제금액')) else 0
-                                        status = str(row.get('상태', '접수'))
+                                        pm = str(row.get('결제내역', row.get('상태', '입금')))
+                                        if pm not in PAYMENT_OPTIONS:
+                                            pm = '입금'
+                                        memo_val = str(row.get('메모', '')) if pd.notnull(row.get('메모')) else ""
+                                        
                                         created_at = pd.to_datetime(row.get('접수일시')).to_pydatetime() if pd.notnull(row.get('접수일시')) else get_kst_now()
                                         pickup_dt = pd.to_datetime(row.get('픽업일시')).to_pydatetime() if pd.notnull(row.get('픽업일시')) else get_kst_now()
                                         
                                         conn.execute(text("""
-                                            INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime, status, created_at)
-                                            VALUES (:cid, :pn, :p, :am, :pdt, :st, :cat)
+                                            INSERT INTO orders (customer_id, product_name, product, amount, pickup_datetime, status, payment_method, memo, created_at)
+                                            VALUES (:cid, :pn, :p, :am, :pdt, :st, :pm, :memo, :cat)
                                         """), {
                                             "cid": cid, "pn": p_name, "p": p_name,
-                                            "am": amount, "pdt": pickup_dt, "st": status, "cat": created_at
+                                            "am": amount, "pdt": pickup_dt, "st": pm, "pm": pm, "memo": memo_val, "cat": created_at
                                         })
                                         success_cnt += 1
                                 conn.commit()
+                                st.success(f"🎉 총 {success_cnt}건의 주문 데이터가 추가 및 달력에 적용되었습니다!")
                                 
                         st.rerun()
 
