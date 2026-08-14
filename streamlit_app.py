@@ -503,4 +503,4 @@ elif menu == "🔔 알림 발송 현황":
             )
         st.dataframe(df_1day, use_container_width=True)
     except Exception:
-        st.write("현재 발송 대상 알림이 없습니다.")
+        st.write("현재 발송 대상 알림이 없습니다.") 
