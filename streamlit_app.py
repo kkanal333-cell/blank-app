@@ -23,7 +23,7 @@ st.markdown("""
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
     }
 
-    /* === PC 화면 전용 복원 (769px 이상) === */
+    /* === PC 화면 전용 (769px 이상) === */
     @media (min-width: 769px) {
         .main .block-container {
             padding-top: 2rem !important;
@@ -47,26 +47,43 @@ st.markdown("""
         }
     }
 
-    /* === 모바일 전용 여백 제로화 (768px 이하) === */
+    /* === 모바일 전용 (768px 이하) === */
     @media (max-width: 768px) {
+        /* 사이드바 열기 화살표(메뉴 버튼) 위치 보정 */
         header[data-testid="stHeader"] {
-            height: 0rem !important;
-            min-height: 0rem !important;
+            height: 2.2rem !important;
+            min-height: 2.2rem !important;
             background: transparent !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-
-        [data-testid="stHeader"] > div {
-            padding: 0 !important;
+            padding: 0.2rem 0.5rem 0 0.5rem !important;
         }
 
         .main .block-container {
-            padding-top: 0.2rem !important;
+            padding-top: 0.5rem !important;
             padding-bottom: 0.5rem !important;
             padding-left: 0.3rem !important;
             padding-right: 0.3rem !important;
-            margin-top: -3.5rem !important;
+            margin-top: 0rem !important;
+        }
+
+        /* 폼 요소 간격 조절 (컴팩트하게) */
+        div[data-testid="stForm"] {
+            padding: 0.4rem !important;
+        }
+
+        /* 입력 컴포넌트 간 위아래 간격 축소 */
+        div[data-testid="stVerticalBlock"] > div {
+            gap: 0.3rem !important;
+        }
+
+        /* element-container 위아래 마진 축소 */
+        .element-container {
+            margin-bottom: 0.2rem !important;
+        }
+
+        /* 라벨과 입력창 사이 간격 축소 */
+        .stMarkdown, label {
+            margin-bottom: 0.1rem !important;
+            font-size: 0.88rem !important;
         }
 
         h1 {
@@ -74,7 +91,7 @@ st.markdown("""
             font-weight: 700 !important;
             color: #582C83 !important;
             margin-top: 0 !important;
-            margin-bottom: 0.2rem !important;
+            margin-bottom: 0.3rem !important;
             padding-top: 0 !important;
             line-height: 1.2 !important;
         }
@@ -85,10 +102,6 @@ st.markdown("""
             color: #2D3748 !important;
             margin-top: 0.2rem !important;
             margin-bottom: 0.2rem !important;
-        }
-
-        div[data-testid="stForm"] {
-            padding: 0.5rem !important;
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -115,6 +128,17 @@ st.markdown("""
 
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
+
+# 12시간제를 24시간제 time 객체로 변환해주는 함수
+def parse_12h_time(period, hour_12, minute=0):
+    hour = int(hour_12)
+    if period == "PM" or period == "오후":
+        if hour < 12:
+            hour += 12
+    elif period == "AM" or period == "오전":
+        if hour == 12:
+            hour = 0
+    return time(hour, minute)
 
 @st.cache_resource
 def get_connection():
@@ -146,6 +170,8 @@ if engine:
 st.title("💐 화사한 하루 고객 & 주문 관리")
 
 PAYMENT_OPTIONS = ["네이버", "전화", "입금", "현금", "미결제"]
+PRODUCT_OPTIONS = ["꽃다발", "꽃바구니", "햇살콘플라워", "꽃묶음", "식물", "용품", "시즌한정", "기타"]
+HOURS_12 = [str(i) for i in range(1, 13)]
 
 menu_options = [
     "📝 신규 주문 및 고객 등록", 
@@ -170,32 +196,43 @@ if engine:
             with col1:
                 customer_name = st.text_input("고객 이름 *")
                 phone = st.text_input("휴대폰 번호")
-                product_name = st.text_input("주문 상품명 *")
-                amount = st.number_input("결제 금액 (원)", min_value=0, step=1000, value=50000)
+                product_name = st.selectbox("주문 상품명 *", PRODUCT_OPTIONS)
+                amount = st.number_input("결제 금액 (원)", min_value=0, step=5000, value=55000)
                 
             with col2:
-                sub_col1, sub_col2 = st.columns(2)
-                with sub_col1:
+                # 접수 일시
+                t_col1, t_col2, t_col3 = st.columns([2, 1, 1])
+                with t_col1:
                     order_date = st.date_input("접수 날짜", now_kst.date())
-                with sub_col2:
-                    order_time = st.time_input("접수 시간", now_kst.time())
+                with t_col2:
+                    order_period = st.selectbox("접수 AM/PM", ["AM", "PM"], index=0 if now_kst.hour < 12 else 1)
+                with t_col3:
+                    curr_12h = now_kst.hour if now_kst.hour <= 12 else now_kst.hour - 12
+                    curr_12h = 12 if curr_12h == 0 else curr_12h
+                    order_hour = st.selectbox("접수 시간", HOURS_12, index=HOURS_12.index(str(curr_12h)))
                 
-                sub_col3, sub_col4 = st.columns(2)
-                with sub_col3:
+                # 픽업 일시
+                p_col1, p_col2, p_col3 = st.columns([2, 1, 1])
+                with p_col1:
                     pickup_date = st.date_input("픽업 날짜", now_kst.date())
-                with sub_col4:
-                    pickup_time = st.time_input("픽업 시간", time(14, 0))
+                with p_col2:
+                    pickup_period = st.selectbox("픽업 AM/PM", ["PM", "AM"], index=0)
+                with p_col3:
+                    pickup_hour = st.selectbox("픽업 시간", HOURS_12, index=HOURS_12.index("2"))
                     
                 payment_method = st.selectbox("결제내역 *", PAYMENT_OPTIONS)
             
-            memo = st.text_area("고객 요구사항 / 메모", placeholder="요구사항이나 특이사항을 적어주세요.")
+            memo = st.text_area("고객 요구사항 / 메모", placeholder="요구사항이나 특이사항을 적어주세요.", height=70)
             
             submit = st.form_submit_button("🌸 주문 저장하기", use_container_width=True)
             if submit:
-                if not customer_name or not product_name:
-                    st.warning("고객 이름과 주문 상품명은 필수 입력 항목입니다.")
+                if not customer_name:
+                    st.warning("고객 이름은 필수 입력 항목입니다.")
                 else:
                     try:
+                        order_time = parse_12h_time(order_period, order_hour)
+                        pickup_time = parse_12h_time(pickup_period, pickup_hour)
+                        
                         order_datetime = datetime.combine(order_date, order_time)
                         pickup_datetime = datetime.combine(pickup_date, pickup_time)
                         
@@ -284,7 +321,7 @@ if engine:
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v15")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v17")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
@@ -330,21 +367,33 @@ if engine:
                             with col1:
                                 edit_name = st.text_input("고객명", value=str(cal_selected_row['customer_name'] or ""))
                                 edit_phone = st.text_input("연락처", value=str(cal_selected_row['phone'] or ""))
-                                edit_product = st.text_input("상품명", value=str(cal_selected_row['product_name'] or ""))
-                                edit_amount = st.number_input("금액 (원)", min_value=0, step=1000, value=int(cal_selected_row['amount'] or 0))
-                            with col2:
-                                sub_col1, sub_col2 = st.columns(2)
-                                with sub_col1: edit_order_date = st.date_input("접수 날짜", value=c_cat.date())
-                                with sub_col2: edit_order_time = st.time_input("접수 시간", value=c_cat.time())
-                                sub_col3, sub_col4 = st.columns(2)
-                                with sub_col3: edit_pickup_date = st.date_input("픽업 날짜", value=c_pdt.date())
-                                with sub_col4: edit_pickup_time = st.time_input("픽업 시간", value=c_pdt.time())
                                 
+                                curr_prod = str(cal_selected_row['product_name'] or "")
+                                curr_prod_idx = PRODUCT_OPTIONS.index(curr_prod) if curr_prod in PRODUCT_OPTIONS else PRODUCT_OPTIONS.index("기타")
+                                edit_product = st.selectbox("상품명", PRODUCT_OPTIONS, index=curr_prod_idx)
+                                edit_amount = st.number_input("금액 (원)", min_value=0, step=5000, value=int(cal_selected_row['amount'] or 55000))
+                            with col2:
+                                tc1, tc2, tc3 = st.columns([2, 1, 1])
+                                with tc1: edit_order_date = st.date_input("접수 날짜", value=c_cat.date())
+                                with tc2: edit_order_period = st.selectbox("접수 AM/PM", ["AM", "PM"], index=0 if c_cat.hour < 12 else 1, key="e_o_p_cal")
+                                with tc3: 
+                                    c_h = c_cat.hour if c_cat.hour <= 12 else c_cat.hour - 12
+                                    c_h = 12 if c_h == 0 else c_h
+                                    edit_order_hour = st.selectbox("접수 시간", HOURS_12, index=HOURS_12.index(str(c_h)), key="e_o_h_cal")
+
+                                pc1, pc2, pc3 = st.columns([2, 1, 1])
+                                with pc1: edit_pickup_date = st.date_input("픽업 날짜", value=c_pdt.date())
+                                with pc2: edit_pickup_period = st.selectbox("픽업 AM/PM", ["AM", "PM"], index=0 if c_pdt.hour < 12 else 1, key="e_p_p_cal")
+                                with pc3:
+                                    p_h = c_pdt.hour if c_pdt.hour <= 12 else c_pdt.hour - 12
+                                    p_h = 12 if p_h == 0 else p_h
+                                    edit_pickup_hour = st.selectbox("픽업 시간", HOURS_12, index=HOURS_12.index(str(p_h)), key="e_p_h_cal")
+
                                 curr_pm = cal_selected_row['payment_method']
                                 curr_pm_idx = PAYMENT_OPTIONS.index(curr_pm) if curr_pm in PAYMENT_OPTIONS else 0
                                 edit_pm = st.selectbox("결제내역", PAYMENT_OPTIONS, index=curr_pm_idx)
                             
-                            edit_memo = st.text_area("고객 요구사항 / 메모", value=str(cal_selected_row['memo'] or ""))
+                            edit_memo = st.text_area("고객 요구사항 / 메모", value=str(cal_selected_row['memo'] or ""), height=70)
                             
                             btn_col1, btn_col2 = st.columns(2)
                             with btn_col1: update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
@@ -352,6 +401,9 @@ if engine:
                             
                             if update_btn:
                                 try:
+                                    edit_order_time = parse_12h_time(edit_order_period, edit_order_hour)
+                                    edit_pickup_time = parse_12h_time(edit_pickup_period, edit_pickup_hour)
+                                    
                                     edit_cat = datetime.combine(edit_order_date, edit_order_time)
                                     edit_pdt = datetime.combine(edit_pickup_date, edit_pickup_time)
                                     cid = int(cal_selected_row['customer_id']) if pd.notnull(cal_selected_row['customer_id']) else None
@@ -440,21 +492,33 @@ if engine:
                         with col1:
                             edit_name = st.text_input("고객명", value=str(selected_row['customer_name'] or ""))
                             edit_phone = st.text_input("연락처", value=str(selected_row['phone'] or ""))
-                            edit_product = st.text_input("상품명", value=str(selected_row['product_name'] or ""))
-                            edit_amount = st.number_input("금액 (원)", min_value=0, step=1000, value=int(selected_row['amount'] or 0))
-                        with col2:
-                            sub_col1, sub_col2 = st.columns(2)
-                            with sub_col1: edit_order_date = st.date_input("접수 날짜", value=curr_cat.date())
-                            with sub_col2: edit_order_time = st.time_input("접수 시간", value=curr_cat.time())
-                            sub_col3, sub_col4 = st.columns(2)
-                            with sub_col3: edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date())
-                            with sub_col4: edit_pickup_time = st.time_input("픽업 시간", value=curr_pdt.time())
                             
+                            curr_prod = str(selected_row['product_name'] or "")
+                            curr_prod_idx = PRODUCT_OPTIONS.index(curr_prod) if curr_prod in PRODUCT_OPTIONS else PRODUCT_OPTIONS.index("기타")
+                            edit_product = st.selectbox("상품명", PRODUCT_OPTIONS, index=curr_prod_idx)
+                            edit_amount = st.number_input("금액 (원)", min_value=0, step=5000, value=int(selected_row['amount'] or 55000))
+                        with col2:
+                            tc1, tc2, tc3 = st.columns([2, 1, 1])
+                            with tc1: edit_order_date = st.date_input("접수 날짜", value=curr_cat.date())
+                            with tc2: edit_order_period = st.selectbox("접수 AM/PM", ["AM", "PM"], index=0 if curr_cat.hour < 12 else 1, key="e_o_p_all")
+                            with tc3: 
+                                c_h = curr_cat.hour if curr_cat.hour <= 12 else curr_cat.hour - 12
+                                c_h = 12 if c_h == 0 else c_h
+                                edit_order_hour = st.selectbox("접수 시간", HOURS_12, index=HOURS_12.index(str(c_h)), key="e_o_h_all")
+
+                            pc1, pc2, pc3 = st.columns([2, 1, 1])
+                            with pc1: edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date())
+                            with pc2: edit_pickup_period = st.selectbox("픽업 AM/PM", ["AM", "PM"], index=0 if curr_pdt.hour < 12 else 1, key="e_p_p_all")
+                            with pc3:
+                                p_h = curr_pdt.hour if curr_pdt.hour <= 12 else curr_pdt.hour - 12
+                                p_h = 12 if p_h == 0 else p_h
+                                edit_pickup_hour = st.selectbox("픽업 시간", HOURS_12, index=HOURS_12.index(str(p_h)), key="e_p_h_all")
+
                             curr_pm = selected_row['payment_method']
                             curr_pm_idx = PAYMENT_OPTIONS.index(curr_pm) if curr_pm in PAYMENT_OPTIONS else 0
                             edit_pm = st.selectbox("결제내역", PAYMENT_OPTIONS, index=curr_pm_idx)
                         
-                        edit_memo = st.text_area("고객 요구사항 / 메모", value=str(selected_row['memo'] or ""))
+                        edit_memo = st.text_area("고객 요구사항 / 메모", value=str(selected_row['memo'] or ""), height=70)
                         
                         btn_col1, btn_col2 = st.columns(2)
                         with btn_col1: update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
@@ -462,6 +526,9 @@ if engine:
                         
                         if update_btn:
                             try:
+                                edit_order_time = parse_12h_time(edit_order_period, edit_order_hour)
+                                edit_pickup_time = parse_12h_time(edit_pickup_period, edit_pickup_hour)
+                                
                                 edit_cat = datetime.combine(edit_order_date, edit_order_time)
                                 edit_pdt = datetime.combine(edit_pickup_date, edit_pickup_time)
                                 cid = int(selected_row['customer_id']) if pd.notnull(selected_row['customer_id']) else None
@@ -617,7 +684,7 @@ if engine:
                                             ins_res = conn.execute(text("INSERT INTO customers (name, phone) VALUES (:n, :p) RETURNING id"), {"n": c_name, "p": c_phone})
                                             cid = int(ins_res.fetchone()[0])
                                         
-                                        amount = int(row.get('결제금액', 0)) if pd.notnull(row.get('결제금액')) else 0
+                                        amount = int(row.get('결제금액', 55000)) if pd.notnull(row.get('결제금액')) else 55000
                                         pm = str(row.get('결제내역', row.get('상태', '입금')))
                                         if pm not in PAYMENT_OPTIONS:
                                             pm = '입금'
