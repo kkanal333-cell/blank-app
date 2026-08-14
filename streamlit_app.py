@@ -81,7 +81,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 왼쪽 사이드바 메뉴 구성
 st.sidebar.markdown("### 💐 화사한 하루")
 menu = st.sidebar.radio(
     "메뉴 선택", 
@@ -142,7 +141,7 @@ if menu == "신규 주문":
                 st.success(f"'{cust_name}'님의 주문이 성공적으로 저장되었습니다!")
 
 elif menu == "전체 주문 목록 & 달력":
-    st.markdown('<div class="section-title">📋 전체 주문 목록 & 월간 캘린더</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">📋 전체 주문 목록 & 월간 캘린더 및 수정</div>', unsafe_allow_html=True)
     
     if st.session_state.orders:
         df_orders = pd.DataFrame(st.session_state.orders)
@@ -180,7 +179,7 @@ elif menu == "전체 주문 목록 & 달력":
                             st.markdown(f"<div style='text-align: center; padding: 8px; color: #aaa; font-size: 0.8rem;'>{day}</div>", unsafe_allow_html=True)
                             
         st.divider()
-        st.subheader("📋 전체 주문 상세 내역")
+        st.subheader("📋 전체 주문 상세 내역 및 수정/삭제")
         
         if 'selected_cal_date' in st.session_state and st.session_state['selected_cal_date']:
             sel_date = st.session_state['selected_cal_date']
@@ -192,6 +191,46 @@ elif menu == "전체 주문 목록 & 달력":
                 st.rerun()
         else:
             st.dataframe(df_orders, use_container_width=True)
+            
+        # 주문 수정 및 삭제 구역
+        st.divider()
+        st.markdown("#### ✏️ 주문 수정 및 삭제 관리")
+        order_options = [f"{idx}: {o['고객성명']} ({o['주문상품명']} - {o['픽업일시']})" for idx, o in enumerate(st.session_state.orders)]
+        selected_order_str = st.selectbox("수정 또는 삭제할 주문 선택", order_options)
+        
+        if selected_order_str:
+            selected_idx = int(selected_order_str.split(":")[0])
+            target_order = st.session_state.orders[selected_idx]
+            
+            with st.form("edit_form"):
+                st.write(f"**[ {target_order['고객성명']}님 주문 수정 ]**")
+                e_name = st.text_input("고객 성명", value=target_order["고객성명"])
+                e_phone = st.text_input("휴대폰 번호", value=target_order["휴대폰번호"])
+                e_prod = st.selectbox("주문 상품명", ["꽃다발", "꽃바구니", "용돈박스", "화분", "근조화환", "축하화환", "기타"], index=["꽃다발", "꽃바구니", "용돈박스", "화분", "근조화환", "축하화환", "기타"].index(target_order["주문상품명"]) if target_order["주문상품명"] in ["꽃다발", "꽃바구니", "용돈박스", "화분", "근조화환", "축하화환", "기타"] else 0)
+                e_price = st.number_input("결제 금액 (원)", value=int(target_order["결제금액"]), step=1000)
+                e_memo = st.text_area("메모", value=target_order["메모"])
+                
+                col_sub1, col_sub2 = st.columns(2)
+                with col_sub1:
+                    update_btn = st.form_submit_button("💾 수정사항 저장", use_container_width=True)
+                with col_sub2:
+                    delete_btn = st.form_submit_button("🗑️ 주문 삭제", use_container_width=True)
+                    
+                if update_btn:
+                    st.session_state.orders[selected_idx].update({
+                        "고객성명": e_name,
+                        "휴대폰번호": e_phone,
+                        "주문상품명": e_prod,
+                        "결제금액": e_price,
+                        "메모": e_memo
+                    })
+                    st.success("주문 정보가 성공적으로 수정되었습니다!")
+                    st.rerun()
+                    
+                if delete_btn:
+                    del st.session_state.orders[selected_idx]
+                    st.warning("선택하신 주문이 삭제되었습니다.")
+                    st.rerun()
     else:
         st.info("등록된 주문 내역이 없습니다. '신규 주문' 메뉴에서 첫 주문을 등록해 보세요!")
 
