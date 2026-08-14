@@ -1,4 +1,0 @@
-[project]
-name = "blank-app"
-version = "0.1.0"
-dependencies = ["streamlit", "pandas", "sqlalchemy", "psycopg2-binary"]
