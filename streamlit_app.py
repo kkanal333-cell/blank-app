@@ -8,7 +8,6 @@ st.set_page_config(page_title="화사한 하루", layout="wide")
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
-# 세션 스테이트에 주문 데이터 초기화 (기존 데이터 구조 유지)
 if 'orders' not in st.session_state:
     st.session_state.orders = [
         {
@@ -29,7 +28,6 @@ st.markdown("""
     
     * { font-family: 'Pretendard', sans-serif !important; }
 
-    /* 상단 탭 디자인 강조 */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
@@ -47,7 +45,6 @@ st.markdown("""
         color: white !important;
     }
 
-    /* 제목 글씨 크기 및 위치 정돈 */
     .app-title {
         font-size: 1.56rem !important;
         color: #582C83 !important;
@@ -79,7 +76,6 @@ st.markdown("""
         margin-bottom: 2px !important; 
     }
 
-    /* 픽업/접수 일시 가로 정렬 및 수직 센터 맞춤 */
     div[data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
@@ -115,6 +111,11 @@ with tab1:
     st.markdown('<div class="section-title">📝 신규 주문 및 고객 등록</div>', unsafe_allow_html=True)
     now_kst = get_kst_now()
 
+    curr_hour_24 = now_kst.hour
+    is_pm = curr_hour_24 >= 12
+    curr_hour_12 = curr_hour_24 if curr_hour_24 <= 12 else curr_hour_24 - 12
+    curr_hour_12 = 12 if curr_hour_12 == 0 else curr_hour_12
+
     with st.form("main_form"):
         c1, c2 = st.columns(2)
         with c1: cust_name = st.text_input("고객 성명 *")
@@ -128,11 +129,6 @@ with tab1:
         with p1: p_date = st.date_input("픽업 일시 *", now_kst.date(), key="p_date")
         with p2: p_period = st.selectbox(" ", ["AM", "PM"], index=1, key="p_period", label_visibility="collapsed")
         with p3: p_time = st.time_input(" ", time(14, 0), key="p_time", label_visibility="collapsed")
-        
-        curr_hour_24 = now_kst.hour
-        is_pm = curr_hour_24 >= 12
-        curr_hour_12 = curr_hour_24 if curr_hour_12 <= 12 else curr_hour_24 - 12
-        curr_hour_12 = 12 if curr_hour_12 == 0 else curr_hour_12
         
         o1, o2, o3 = st.columns([2.2, 1, 1.4])
         with o1: o_date = st.date_input("접수 일시 *", now_kst.date(), key="o_date")
@@ -162,8 +158,6 @@ with tab1:
 
 with tab2:
     st.markdown('<div class="section-title">📋 전체 주문 목록 & 달력</div>', unsafe_allow_html=True)
-    
-    # 기존에 사용하시던 달력 및 주문 목록 배치 복원
     col_cal, col_list = st.columns([1, 1.3])
     with col_cal:
         st.subheader("📅 날짜 선택 캘린더")
@@ -177,8 +171,7 @@ with tab2:
 
 with tab3:
     st.markdown('<div class="section-title">🎂 고객 관리</div>', unsafe_allow_html=True)
-    search_query = st.text_input("🔍 등록된 고객 검색", placeholder="고객 이름 또는 연락처 검색")
-    
+    st.text_input("🔍 등록된 고객 검색", placeholder="고객 이름 또는 연락처 검색")
     if st.session_state.orders:
         df_cust = pd.DataFrame(st.session_state.orders)[["고객성명", "휴대폰번호", "주문상품명", "접수일시"]]
         st.dataframe(df_cust, use_container_width=True)
