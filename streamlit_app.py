@@ -25,46 +25,66 @@ st.markdown("""
 
     /* Form 내부 요소 간 위아래 여백 극소화 */
     div[data-testid="stForm"] {
-        padding: 0.5rem !important;
+        padding: 0.8rem !important;
+        border-radius: 12px !important;
     }
     
-    /* 세로 블록 간격 축소 (PC/모바일 공통) */
+    /* 세로 블록 간격 축소 */
     div[data-testid="stVerticalBlock"] > div {
-        gap: 0.2rem !important;
+        gap: 0.3rem !important;
     }
 
     .element-container {
-        margin-bottom: 0.1rem !important;
+        margin-bottom: 0.2rem !important;
     }
 
     /* 입력 폼 라벨 하단 간격 극소화 */
     label, div[data-testid="stWidgetLabel"] {
-        margin-bottom: 0px !important;
-        padding-bottom: 2px !important;
-        font-size: 0.85rem !important;
+        margin-bottom: 2px !important;
+        padding-bottom: 0px !important;
+        font-size: 0.88rem !important;
+        font-weight: 600 !important;
+        color: #4A5568 !important;
     }
 
-    /* === 모바일 세로 화면에서도 st.columns 컬럼 강제 한 행(가로) 배치 === */
-    [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        gap: 0.15rem !important;
-    }
+    /* 모바일 세로화면 한 줄 배치용 프레임 (가로 스크롤 방지 & 너비 줄임) */
+    @media (max-width: 768px) {
+        div[data-testid="stForm"] {
+            padding: 0.4rem !important;
+        }
 
-    /* 각 컬럼 패딩 축소 및 너비 자동 조절 */
-    [data-testid="column"] {
-        padding-left: 1px !important;
-        padding-right: 1px !important;
-        min-width: 0 !important;
-    }
+        /* 날짜, AM/PM, 시간 3개 세트 컬럼만 가로 1행으로 강제 묶음 */
+        .time-row-container [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            width: 100% !important;
+            gap: 2px !important;
+        }
 
-    /* 모바일 세로화면 입력 박스 폰트 및 여백 최적화 */
-    div[data-baseweb="select"] > div, input {
-        font-size: 0.82rem !important;
-        padding-left: 4px !important;
-        padding-right: 4px !important;
+        .time-row-container [data-testid="column"] {
+            padding: 0 !important;
+            min-width: 0 !important;
+            flex: 1 1 auto !important;
+        }
+
+        /* 위젯 내부 공간 및 폰트 축소로 한 스크린 안에 딱 맞춤 */
+        .time-row-container input {
+            font-size: 0.72rem !important;
+            padding: 2px 4px !important;
+            text-align: center !important;
+        }
+
+        .time-row-container div[data-baseweb="select"] > div {
+            font-size: 0.72rem !important;
+            padding: 2px 2px !important;
+            min-height: 38px !important;
+        }
+
+        /* 날짜 아이콘/시간 아이콘 모바일 영역 축소 */
+        .time-row-container button {
+            padding: 2px !important;
+        }
     }
 
     /* === PC 화면 전용 (769px 이상) === */
@@ -75,13 +95,13 @@ st.markdown("""
             max-width: 100% !important;
         }
         h1 {
-            font-size: 2.1rem !important;
+            font-size: 2.0rem !important;
             font-weight: 700 !important;
             color: #582C83 !important;
             margin-bottom: 0.8rem !important;
         }
         h2 {
-            font-size: 1.4rem !important;
+            font-size: 1.3rem !important;
             font-weight: 600 !important;
             color: #2D3748 !important;
         }
@@ -90,39 +110,29 @@ st.markdown("""
     /* === 모바일 전용 (768px 이하) === */
     @media (max-width: 768px) {
         header[data-testid="stHeader"] {
-            height: 2.2rem !important;
-            min-height: 2.2rem !important;
+            height: 2.0rem !important;
+            min-height: 2.0rem !important;
             background: transparent !important;
-            padding: 0.2rem 0.5rem 0 0.5rem !important;
         }
 
         .main .block-container {
-            padding-top: 0.5rem !important;
+            padding-top: 0.4rem !important;
             padding-bottom: 0.5rem !important;
-            padding-left: 0.2rem !important;
-            padding-right: 0.2rem !important;
-            margin-top: 0rem !important;
+            padding-left: 0.3rem !important;
+            padding-right: 0.3rem !important;
         }
 
         h1 {
-            font-size: 1.25rem !important;
+            font-size: 1.2rem !important;
             font-weight: 700 !important;
             color: #582C83 !important;
-            margin-top: 0 !important;
             margin-bottom: 0.3rem !important;
-            line-height: 1.2 !important;
         }
 
         h2 {
-            font-size: 1.05rem !important;
+            font-size: 1.0rem !important;
             font-weight: 600 !important;
             color: #2D3748 !important;
-            margin-top: 0.2rem !important;
-            margin-bottom: 0.2rem !important;
-        }
-
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 2px !important;
         }
     }
 
@@ -136,7 +146,7 @@ st.markdown("""
     }
 
     .fc-toolbar-title {
-        font-size: 1.05rem !important;
+        font-size: 1.0rem !important;
         font-weight: 700 !important;
     }
 </style>
@@ -217,9 +227,10 @@ if engine:
                 payment_method = st.selectbox("결제내역 *", PAYMENT_OPTIONS)
                 
             with col2:
-                # 접수 일시 (날짜 | AM/PM | 시간 타이핑을 한 행에 구성)
-                st.markdown("<label style='font-size:0.85rem; font-weight:600;'>접수 일시 *</label>", unsafe_allow_html=True)
-                t_col1, t_col2, t_col3 = st.columns([2.3, 1.2, 2.0])
+                # 접수 일시
+                st.markdown("<label>접수 일시 *</label>", unsafe_allow_html=True)
+                st.markdown('<div class="time-row-container">', unsafe_allow_html=True)
+                t_col1, t_col2, t_col3 = st.columns([1.8, 1.1, 1.6])
                 with t_col1:
                     order_date = st.date_input("접수 날짜", now_kst.date(), label_visibility="collapsed")
                 with t_col2:
@@ -228,16 +239,19 @@ if engine:
                     curr_12h = now_kst.hour if now_kst.hour <= 12 else now_kst.hour - 12
                     curr_12h = 12 if curr_12h == 0 else curr_12h
                     order_time_input = st.time_input("접수 시간", time(curr_12h, now_kst.minute), label_visibility="collapsed")
+                st.markdown('</div>', unsafe_allow_html=True)
                 
-                # 픽업 일시 (날짜 | AM/PM | 시간 타이핑을 한 행에 구성)
-                st.markdown("<label style='font-size:0.85rem; font-weight:600;'>픽업 일시 *</label>", unsafe_allow_html=True)
-                p_col1, p_col2, p_col3 = st.columns([2.3, 1.2, 2.0])
+                # 픽업 일시
+                st.markdown("<label>픽업 일시 *</label>", unsafe_allow_html=True)
+                st.markdown('<div class="time-row-container">', unsafe_allow_html=True)
+                p_col1, p_col2, p_col3 = st.columns([1.8, 1.1, 1.6])
                 with p_col1:
                     pickup_date = st.date_input("픽업 날짜", now_kst.date(), label_visibility="collapsed")
                 with p_col2:
                     pickup_period = st.selectbox("픽업 AM/PM", ["PM", "AM"], index=0, label_visibility="collapsed")
                 with p_col3:
                     pickup_time_input = st.time_input("픽업 시간", time(2, 0), label_visibility="collapsed")
+                st.markdown('</div>', unsafe_allow_html=True)
                     
                 memo = st.text_area("고객 요구사항 / 메모", placeholder="요구사항이나 특이사항을 적어주세요.", height=85)
             
@@ -338,7 +352,7 @@ if engine:
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v20")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v21")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
@@ -396,24 +410,28 @@ if engine:
 
                             with col2:
                                 # 접수 일시
-                                st.markdown("<label style='font-size:0.85rem; font-weight:600;'>접수 일시</label>", unsafe_allow_html=True)
-                                tc1, tc2, tc3 = st.columns([2.3, 1.2, 2.0])
+                                st.markdown("<label>접수 일시</label>", unsafe_allow_html=True)
+                                st.markdown('<div class="time-row-container">', unsafe_allow_html=True)
+                                tc1, tc2, tc3 = st.columns([1.8, 1.1, 1.6])
                                 with tc1: edit_order_date = st.date_input("접수 날짜", value=c_cat.date(), label_visibility="collapsed")
                                 with tc2: edit_order_period = st.selectbox("접수 AM/PM", ["AM", "PM"], index=0 if c_cat.hour < 12 else 1, key="e_o_p_cal", label_visibility="collapsed")
                                 with tc3: 
                                     c_h = c_cat.hour if c_cat.hour <= 12 else c_cat.hour - 12
                                     c_h = 12 if c_h == 0 else c_h
                                     edit_order_time_inp = st.time_input("접수 시간", value=time(c_h, c_cat.minute), key="e_o_t_cal", label_visibility="collapsed")
+                                st.markdown('</div>', unsafe_allow_html=True)
 
                                 # 픽업 일시
-                                st.markdown("<label style='font-size:0.85rem; font-weight:600;'>픽업 일시</label>", unsafe_allow_html=True)
-                                pc1, pc2, pc3 = st.columns([2.3, 1.2, 2.0])
+                                st.markdown("<label>픽업 일시</label>", unsafe_allow_html=True)
+                                st.markdown('<div class="time-row-container">', unsafe_allow_html=True)
+                                pc1, pc2, pc3 = st.columns([1.8, 1.1, 1.6])
                                 with pc1: edit_pickup_date = st.date_input("픽업 날짜", value=c_pdt.date(), label_visibility="collapsed")
                                 with pc2: edit_pickup_period = st.selectbox("픽업 AM/PM", ["AM", "PM"], index=0 if c_pdt.hour < 12 else 1, key="e_p_p_cal", label_visibility="collapsed")
                                 with pc3:
                                     p_h = c_pdt.hour if c_pdt.hour <= 12 else c_pdt.hour - 12
                                     p_h = 12 if p_h == 0 else p_h
                                     edit_pickup_time_inp = st.time_input("픽업 시간", value=time(p_h, c_pdt.minute), key="e_p_t_cal", label_visibility="collapsed")
+                                st.markdown('</div>', unsafe_allow_html=True)
 
                                 edit_memo = st.text_area("고객 요구사항 / 메모", value=str(cal_selected_row['memo'] or ""), height=85)
                             
@@ -526,24 +544,28 @@ if engine:
 
                         with col2:
                             # 접수 일시
-                            st.markdown("<label style='font-size:0.85rem; font-weight:600;'>접수 일시</label>", unsafe_allow_html=True)
-                            tc1, tc2, tc3 = st.columns([2.3, 1.2, 2.0])
+                            st.markdown("<label>접수 일시</label>", unsafe_allow_html=True)
+                            st.markdown('<div class="time-row-container">', unsafe_allow_html=True)
+                            tc1, tc2, tc3 = st.columns([1.8, 1.1, 1.6])
                             with tc1: edit_order_date = st.date_input("접수 날짜", value=curr_cat.date(), label_visibility="collapsed")
                             with tc2: edit_order_period = st.selectbox("접수 AM/PM", ["AM", "PM"], index=0 if curr_cat.hour < 12 else 1, key="e_o_p_all", label_visibility="collapsed")
                             with tc3: 
                                 c_h = curr_cat.hour if curr_cat.hour <= 12 else curr_cat.hour - 12
                                 c_h = 12 if c_h == 0 else c_h
                                 edit_order_time_inp = st.time_input("접수 시간", value=time(c_h, curr_cat.minute), key="e_o_t_all", label_visibility="collapsed")
+                            st.markdown('</div>', unsafe_allow_html=True)
 
                             # 픽업 일시
-                            st.markdown("<label style='font-size:0.85rem; font-weight:600;'>픽업 일시</label>", unsafe_allow_html=True)
-                            pc1, pc2, pc3 = st.columns([2.3, 1.2, 2.0])
+                            st.markdown("<label>픽업 일시</label>", unsafe_allow_html=True)
+                            st.markdown('<div class="time-row-container">', unsafe_allow_html=True)
+                            pc1, pc2, pc3 = st.columns([1.8, 1.1, 1.6])
                             with pc1: edit_pickup_date = st.date_input("픽업 날짜", value=curr_pdt.date(), label_visibility="collapsed")
                             with pc2: edit_pickup_period = st.selectbox("픽업 AM/PM", ["AM", "PM"], index=0 if curr_pdt.hour < 12 else 1, key="e_p_p_all", label_visibility="collapsed")
                             with pc3:
                                 p_h = curr_pdt.hour if curr_pdt.hour <= 12 else curr_pdt.hour - 12
                                 p_h = 12 if p_h == 0 else p_h
                                 edit_pickup_time_inp = st.time_input("픽업 시간", value=time(p_h, curr_pdt.minute), key="e_p_t_all", label_visibility="collapsed")
+                            st.markdown('</div>', unsafe_allow_html=True)
 
                             edit_memo = st.text_area("고객 요구사항 / 메모", value=str(selected_row['memo'] or ""), height=85)
                         
