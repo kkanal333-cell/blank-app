@@ -15,16 +15,13 @@ st.markdown("""
         font-family: 'Pretendard', sans-serif !important;
     }
     
-    /* 사이드바 상단 깨지는 텍스트(keyboard_double_arrow 등) 강제 숨김 */
-    [data-testid="collapsedControl"] span, section[data-testid="stSidebar"] span {
-        /* 아이콘 텍스트 깨짐 방지 */
+    /* 사이드바 상단 깨지는 텍스트(keyboard_double_arrow) 완벽 숨김 처리 */
+    button[kind="header"], [data-testid="collapsedControl"] {
+        font-size: 0px !important;
+        color: transparent !important;
     }
-    button[kind="header"] svg {
-        display: inline-block;
-    }
-    /* 사이드바 상단 불필요한 텍스트 노드 숨기기 */
-    div[data-testid="stSidebarNav"] + div {
-        display: none;
+    button[kind="header"]::before, [data-testid="collapsedControl"]::before {
+        content: "" !important;
     }
     
     /* 제목 글씨 크기 및 행간 */
@@ -71,6 +68,7 @@ st.markdown("""
         min-width: 0 !important;
     }
     
+    /* 입력창 및 셀렉트박스 높이/정렬 맞춤 */
     .stTextInput input, .stSelectbox select, .stNumberInput input, .stDateInput input, .stTimeInput input {
         min-height: 38px !important;
         height: 38px !important;
