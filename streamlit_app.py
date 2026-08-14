@@ -2,25 +2,16 @@ import streamlit as st
 from datetime import datetime, time, date
 import pytz
 import pandas as pd
+import calendar
 
 st.set_page_config(page_title="화사한 하루", layout="wide")
 
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
+# 세션에 주문 데이터가 없으면 빈 리스트로 초기화 (임의 데이터 제거)
 if 'orders' not in st.session_state:
-    st.session_state.orders = [
-        {
-            "고객성명": "김화사",
-            "휴대폰번호": "010-1234-5678",
-            "주문상품명": "꽃다발",
-            "결제금액": 55000,
-            "픽업일시": "2026-08-14 PM 14:00",
-            "접수일시": "2026-08-14 16:04",
-            "결제내역": "네이버",
-            "메모": "예쁘게 만들어주세요"
-        }
-    ]
+    st.session_state.orders = []
 
 st.markdown("""
 <style>
@@ -148,7 +139,8 @@ with tab1:
                     "휴대폰번호": cust_phone,
                     "주문상품명": prod_name,
                     "결제금액": prod_price,
-                    "픽업일시": f"{p_date} {p_period} {p_time.strftime('%H:%M')}",
+                    "픽업일자": str(p_date),
+                    "픽업시간": f"{p_period} {p_time.strftime('%H:%M')}",
                     "접수일시": f"{o_date} {o_time.strftime('%H:%M')}",
                     "결제내역": pay_method,
                     "메모": memo
@@ -157,21 +149,54 @@ with tab1:
                 st.success(f"'{cust_name}'님의 주문이 성공적으로 저장되었습니다!")
 
 with tab2:
-    st.markdown('<div class="section-title">📋 전체 주문 목록 & 달력</div>', unsafe_allow_html=True)
-    col_cal, col_list = st.columns([1, 1.3])
-    with col_cal:
-        st.subheader("📅 날짜 선택 캘린더")
-        cal_date = st.date_input("달력 날짜 선택", date.today(), key="calendar_view_date")
-        st.info(f"📌 선택하신 **{cal_date}** 일자의 픽업 주문을 확인합니다.")
-        
-    with col_list:
-        st.subheader("📋 전체 주문 내역")
+    st.markdown('<div class="section-title">📋 전체 주문 목록 & 월간 캘린더</div>', unsafe_allow_html=True)
+    
+    if st.session_state.orders:
         df_orders = pd.DataFrame(st.session_state.orders)
+        
+        # 월간 캘린더 선택 기능
+        col_y, col_m = st.columns(2)
+        with col_y:
+            sel_year = st.selectbox("연도 선택", [2025, 2026, 2027], index=1)
+        with col_m:
+            sel_month = st.selectbox("월 선택", list(range(1, 13)), index=now_kst.month - 1)
+            
+        st.write(f"### 📅 {sel_year}년 {sel_month}월 캘린더 뷰")
+        
+        # 달력 생성
+        cal = calendar.monthcalendar(sel_year, sel_month)
+        week_days = ["월", "화", "수", "목", "금", "토", "일"]
+        
+        cols = st.columns(7)
+        for i, day_name in enumerate(week_days):
+            cols[i].markdown(f"<div style='text-align: center; font-weight: bold; color: #582C83;'>{day_name}</div>", unsafe_allow_html=True)
+            
+        for week in cal:
+            cols = st.columns(7)
+            for i, day in enumerate(week):
+                with cols[i]:
+                    if day == 0:
+                        st.write("")
+                    else:
+                        date_str = f"{sel_year}-{sel_month:02d}-{day:02d}"
+                        # 해당 날짜에 픽업이 있는지 확인
+                        matched = df_orders[df_orders['픽업일자'] == date_str]
+                        count = len(matched)
+                        
+                        if count > 0:
+                            if st.button(f"📌 {day}일 ({count})", key=f"cal_{date_str}", use_container_width=True):
+                                st.session_state['selected_cal_date'] = date_str
+                        else:
+                            st.markdown(f"<div style='text-align: center; padding: 8px; color: #aaa; font-size: 0.8rem;'>{day}</div>", unsafe_allow_html=True)
+                            
+        st.divider()
+        st.subheader("📋 전체 주문 상세 내역")
         st.dataframe(df_orders, use_container_width=True)
+    else:
+        st.info("등록된 주문 내역이 없습니다. '신규 주문' 탭에서 첫 주문을 등록해 보세요!")
 
 with tab3:
     st.markdown('<div class="section-title">🎂 고객 관리</div>', unsafe_allow_html=True)
-    st.text_input("🔍 등록된 고객 검색", placeholder="고객 이름 또는 연락처 검색")
     if st.session_state.orders:
         df_cust = pd.DataFrame(st.session_state.orders)[["고객성명", "휴대폰번호", "주문상품명", "접수일시"]]
         st.dataframe(df_cust, use_container_width=True)
@@ -195,3 +220,5 @@ with tab5:
             mime="text/csv",
             use_container_width=True
         )
+    else:
+        st.info("다운로드할 데이터가 없습니다.")
