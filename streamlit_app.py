@@ -9,13 +9,13 @@ from streamlit_calendar import calendar
 # 페이지 기본 설정
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리", layout="wide", page_icon="💐")
 
-# 스타일 설정: 폰트 통일, 겹침 방지 및 모바일 대응 가로 정렬
+# 스타일 설정: 이전의 안정적인 폰트/크기로 복원 및 모바일 대응 플렉스 레이아웃
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
     html, body, [class*="css"], .stMarkdown, p, div, span, button, input, select {
-        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif !important;
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
     }
 
     div[data-testid="stForm"] {
@@ -24,7 +24,7 @@ st.markdown("""
     }
     
     div[data-testid="stVerticalBlock"] {
-        gap: 0.4rem !important;
+        gap: 0.2rem !important;
     }
 
     label, div[data-testid="stWidgetLabel"] {
@@ -35,7 +35,7 @@ st.markdown("""
     }
 
     .custom-row-label {
-        margin-top: 10px !important;
+        margin-top: 8px !important;
         margin-bottom: 2px !important;
         font-size: 0.88rem !important;
         font-weight: 600 !important;
@@ -43,18 +43,16 @@ st.markdown("""
         display: block !important;
     }
 
-    /* PC와 모바일 모두에서 날짜, AM/PM, 시간을 안정적으로 한 줄에 배치 */
+    /* PC에서는 가로 한 줄, 모바일 세로 화면에서는 비율에 맞게 자연스럽게 배치되도록 설정 */
     .datetime-inline-wrapper {
         display: flex !important;
         flex-direction: row !important;
         gap: 6px !important;
         width: 100% !important;
         align-items: center !important;
-        margin-bottom: 4px !important;
     }
     
     .datetime-inline-wrapper > div {
-        flex: 1 1 auto !important;
         min-width: 0 !important;
     }
 
@@ -163,7 +161,7 @@ if engine:
             with col4:
                 amount = st.number_input("결제 금액 (원)", min_value=0, step=5000, value=55000)
             
-            # 3줄: 픽업일시 (날짜, AM/PM, 시간 한 줄 배치)
+            # 3줄: 픽업일시
             st.markdown('<div class="custom-row-label">픽업 일시 *</div>', unsafe_allow_html=True)
             st.markdown('<div class="datetime-inline-wrapper">', unsafe_allow_html=True)
             p_col1, p_col2, p_col3 = st.columns([2.2, 1, 1.3])
@@ -175,7 +173,7 @@ if engine:
                 pickup_time_input = st.time_input("픽업 시간", time(2, 0), label_visibility="collapsed", key="reg_p_time")
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # 접수일시 (날짜, AM/PM, 시간 한 줄 배치)
+            # 접수일시
             st.markdown('<div class="custom-row-label">접수 일시 *</div>', unsafe_allow_html=True)
             st.markdown('<div class="datetime-inline-wrapper">', unsafe_allow_html=True)
             o_col1, o_col2, o_col3 = st.columns([2.2, 1, 1.3])
