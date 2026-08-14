@@ -1,29 +1,41 @@
 import streamlit as st
 from datetime import datetime, time
 import pytz
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="화사한 하루", layout="wide")
 
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
+# 자바스크립트로 깨진 텍스트 엘리먼트를 실시간 감지하여 영구 제거
+remove_bug_script = """
+<script>
+    function removeBrokenText() {
+        const doc = window.parent.document;
+        const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.nodeValue && node.nodeValue.includes('keyboard_double')) {
+                node.nodeValue = '';
+                if (node.parentElement) {
+                    node.parentElement.style.display = 'none';
+                }
+            }
+        }
+    }
+    const observer = new MutationObserver(removeBrokenText);
+    observer.observe(window.parent.document.body, { childList: true, subtree: true });
+    setInterval(removeBrokenText, 100);
+</script>
+"""
+components.html(remove_bug_script, height=0, width=0)
+
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     
     * { font-family: 'Pretendard', sans-serif !important; }
-    
-    /* 1. 깨진 텍스트(keyboard_double)를 가진 모든 span을 강제 숨김 */
-    [data-testid="collapsedControl"] span {
-        display: none !important;
-    }
-    
-    /* 2. 그 자리에 고정된 SVG 아이콘을 주입 (메뉴 확장 버튼) */
-    [data-testid="collapsedControl"]::after {
-        content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23582C83' width='24px' height='24px'%3E%3Cpath d='M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z'/%3E%3C/svg%3E");
-        display: block !important;
-        cursor: pointer;
-    }
 
     /* 제목 글씨 크기 및 위치 정돈 */
     .app-title {
