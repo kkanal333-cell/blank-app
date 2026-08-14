@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime, time
 import pytz
+import pandas as pd
 
 st.set_page_config(page_title="화사한 하루", layout="wide")
 
@@ -18,12 +19,13 @@ st.markdown("""
         gap: 8px;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 45px;
+        height: 42px;
         background-color: #FAFAFB;
         border-radius: 8px;
         border: 1px solid #E2D5F1;
         font-weight: 600;
         color: #582C83;
+        font-size: 0.85rem;
     }
     .stTabs [aria-selected="true"] {
         background-color: #582C83 !important;
@@ -86,7 +88,6 @@ st.markdown("""
 
 st.markdown('<div class="app-title">💐 화사한 하루 고객 & 주문 관리</div>', unsafe_allow_html=True)
 
-# 상단 탭 메뉴로 전환하여 모바일 편의성 극대화
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📝 신규 주문", 
     "📋 주문 목록", 
@@ -108,13 +109,11 @@ with tab1:
         with c3: st.selectbox("주문 상품명 *", ["꽃다발", "꽃바구니", "기타"])
         with c4: st.number_input("결제 금액 (원)", value=55000)
         
-        # 픽업 일시
         p1, p2, p3 = st.columns([2.2, 1, 1.4])
         with p1: st.date_input("픽업 일시 *", now_kst.date(), key="p_date")
         with p2: st.selectbox(" ", ["AM", "PM"], index=1, key="p_period", label_visibility="collapsed")
         with p3: st.time_input(" ", time(14, 0), key="p_time", label_visibility="collapsed")
         
-        # 접수 일시 (현재 KST 시간 반영)
         curr_hour_24 = now_kst.hour
         is_pm = curr_hour_24 >= 12
         curr_hour_12 = curr_hour_24 if curr_hour_24 <= 12 else curr_hour_24 - 12
@@ -132,16 +131,36 @@ with tab1:
 
 with tab2:
     st.markdown('<div class="section-title">📋 전체 주문 목록 & 달력</div>', unsafe_allow_html=True)
-    st.info("주문 목록 화면입니다.")
+    st.text_input("🔍 고객명 또는 연락처 검색", placeholder="검색어를 입력하세요")
+    
+    # 샘플 데이터 테이블 표시
+    sample_data = pd.DataFrame({
+        "접수일시": ["2026-08-14 16:04", "2026-08-14 14:20"],
+        "고객명": ["김화사", "이플라워"],
+        "연락처": ["010-1234-5678", "010-9876-5432"],
+        "상품명": ["꽃다발", "꽃바구니"],
+        "금액": ["55,000원", "70,000원"],
+        "픽업일시": ["2026-08-14 PM 14:00", "2026-08-15 PM 13:00"],
+        "결제": ["네이버", "입금"]
+    })
+    st.dataframe(sample_data, use_container_width=True)
 
 with tab3:
     st.markdown('<div class="section-title">🎂 고객 관리</div>', unsafe_allow_html=True)
-    st.info("고객 관리 화면입니다.")
+    st.text_input("🔍 등록된 고객 검색", placeholder="고객 이름 검색")
+    customer_data = pd.DataFrame({
+        "고객명": ["김화사", "이플라워"],
+        "연락처": ["010-1234-5678", "010-9876-5432"],
+        "총 주문 횟수": [3, 1],
+        "최근 주문일": ["2026-08-14", "2026-08-14"]
+    })
+    st.dataframe(customer_data, use_container_width=True)
 
 with tab4:
     st.markdown('<div class="section-title">🔔 알림 발송 현황</div>', unsafe_allow_html=True)
-    st.info("알림 발송 현황 화면입니다.")
+    st.info("픽업 안내 및 기념일 알림 발송 내역을 관리하는 공간입니다.")
 
 with tab5:
     st.markdown('<div class="section-title">📥 데이터 CSV 백업</div>', unsafe_allow_html=True)
-    st.info("데이터 백업 화면입니다.")
+    st.write("저장된 전체 주문 및 고객 데이터를 CSV 파일로 다운로드합니다.")
+    st.download_button("📂 전체 데이터 CSV 다운로드", data="sample,csv,data", file_name="order_backup.csv", use_container_width=True)
