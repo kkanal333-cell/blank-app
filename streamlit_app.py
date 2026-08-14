@@ -1,11 +1,54 @@
 import streamlit as st
 from datetime import datetime, time
 import pytz
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="화사한 하루", layout="wide", initial_sidebar_state="expanded")
 
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
+
+# 모바일에서 메뉴(radio 버튼)를 누르면 사이드바가 자동으로 닫히도록 처리하는 스크립트
+auto_close_sidebar_script = """
+<script>
+    function setupMobileSidebarClose() {
+        const doc = window.parent.document;
+        // 사이드바 내부의 라디오 버튼이나 라벨을 클릭했을 때
+        const radios = doc.querySelectorAll('[data-testid="stSidebar"] [data-baseweb="radio"]');
+        radios.forEach(radio => {
+            if (!radio.dataset.listenerAdded) {
+                radio.dataset.listenerAdded = 'true';
+                radio.addEventListener('click', () => {
+                    // 화면이 모바일 크기(예: 1024px 미만)일 때만 사이드바 토글 버튼을 시뮬레이션하여 닫음
+                    if (window.parent.innerWidth < 1024) {
+                        const toggleBtn = doc.querySelector('[data-testid="collapsedControl"]');
+                        if (toggleBtn) {
+                            toggleBtn.click();
+                        } else {
+                            // 대안으로 오버레이 영역 클릭 시도
+                            const overlay = doc.querySelector('[data-testid="stSidebarOverlay"]');
+                            if (overlay) overlay.click();
+                        }
+                    }
+                });
+            }
+        });
+        
+        // 깨진 텍스트 정리
+        const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.nodeValue && node.nodeValue.includes('keyboard_double')) {
+                node.nodeValue = '';
+            }
+        }
+    }
+    const observer = new MutationObserver(setupMobileSidebarClose);
+    observer.observe(window.parent.document.body, { childList: true, subtree: true });
+    setInterval(setupMobileSidebarClose, 200);
+</script>
+"""
+components.html(auto_close_sidebar_script, height=0, width=0)
 
 st.markdown("""
 <style>
