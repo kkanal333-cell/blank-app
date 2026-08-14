@@ -13,14 +13,19 @@ st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* 모바일/PC 사이드바 버튼 및 토글 항상 보이도록 강제 지정 */
+    /* 모바일/PC 사이드바 버튼 및 토글 항상 보이도록 지정 */
     [data-testid="stSidebarNav"] {
         display: block !important;
+    }
+
+    /* 아이콘 폰트(Material Symbols)가 Pretendard로 깨지는 문제 방지 */
+    [class*="material-symbols"], [class*="MaterialIcons"], i {
+        font-family: 'Material Symbols Outlined', 'Material Icons' !important;
     }
     
     /* 깔끔한 모던 고딕 폰트 전면 적용 */
     html, body, [class*="css"], .stMarkdown, p, div, span, button, input, select {
-        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif !important;
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
         color: #2D3748;
     }
 
@@ -28,7 +33,7 @@ st.markdown("""
     h1 {
         font-size: 1.5rem !important;
         font-weight: 700 !important;
-        color: #582C83 !important; /* 간판 딥 퍼플 포인트 */
+        color: #582C83 !important;
         margin-bottom: 0.8rem !important;
     }
     h2 {
