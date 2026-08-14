@@ -504,3 +504,44 @@ elif menu == "🔔 알림 발송 현황":
         st.dataframe(df_1day, use_container_width=True)
     except Exception:
         st.write("현재 발송 대상 알림이 없습니다.") 
+
+elif menu == "📥 데이터 백업 (CSV)":
+    st.header("📥 데이터 CSV 백업 (엑셀 저장)")
+    st.write("데이터베이스에 저장된 모든 고객 및 주문 내역을 엑셀(CSV) 파일로 다운로드합니다.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("1. 전체 주문 내역 백업")
+        try:
+            df_orders = pd.read_sql("SELECT * FROM orders ORDER BY id DESC", engine)
+            if not df_orders.empty:
+                csv_orders = df_orders.to_csv(index=False, encoding='utf-8-sig')
+                st.download_button(
+                    label="📥 주문 내역 CSV 다운로드",
+                    data=csv_orders,
+                    file_name="flower_orders_backup.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            else:
+                st.info("등록된 주문 내역이 없습니다.")
+        except Exception as e:
+            st.error(f"주문 데이터 불러오기 오류: {e}")
+
+    with col2:
+        st.subheader("2. 전체 고객 목록 백업")
+        try:
+            df_customers = pd.read_sql("SELECT * FROM customers ORDER BY id DESC", engine)
+            if not df_customers.empty:
+                csv_customers = df_customers.to_csv(index=False, encoding='utf-8-sig')
+                st.download_button(
+                    label="📥 고객 목록 CSV 다운로드",
+                    data=csv_customers,
+                    file_name="flower_customers_backup.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            else:
+                st.info("등록된 고객 정보가 없습니다.")
+        except Exception as e:
+            st.error(f"고객 데이터 불러오기 오류: {e}")
