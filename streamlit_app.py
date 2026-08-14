@@ -9,7 +9,6 @@ st.set_page_config(page_title="화사한 하루", layout="wide")
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
-# 세션 상태 초기화 및 샘플/기존 데이터 보존
 if 'orders' not in st.session_state:
     st.session_state.orders = [
         {
@@ -28,31 +27,13 @@ if 'orders' not in st.session_state:
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-    
     * { font-family: 'Pretendard', sans-serif !important; }
-
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 42px;
-        background-color: #FAFAFB;
-        border-radius: 8px;
-        border: 1px solid #E2D5F1;
-        font-weight: 600;
-        color: #582C83;
-        font-size: 0.85rem;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #582C83 !important;
-        color: white !important;
-    }
 
     .app-title {
         font-size: 1.56rem !important;
         color: #582C83 !important;
         font-weight: 700 !important;
-        margin-top: 0.2rem !important;
+        margin-top: -1.0rem !important;
         margin-bottom: 0.6rem !important;
         line-height: 1.4 !important;
     }
@@ -60,8 +41,8 @@ st.markdown("""
         font-size: 1.26rem !important;
         color: #582C83 !important;
         font-weight: 600 !important;
-        margin-top: 0.6rem !important;
-        margin-bottom: 1.0rem !important;
+        margin-top: 0.2rem !important;
+        margin-bottom: 0.8rem !important;
         line-height: 1.4 !important;
     }
     
@@ -100,17 +81,17 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# 왼쪽 사이드바 메뉴 구성
+st.sidebar.markdown("### 💐 화사한 하루")
+menu = st.sidebar.radio(
+    "메뉴 선택", 
+    ["신규 주문", "전체 주문 목록 & 달력", "고객 관리", "알림 현황", "데이터 백업"],
+    label_visibility="collapsed"
+)
+
 st.markdown('<div class="app-title">💐 화사한 하루 고객 & 주문 관리</div>', unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📝 신규 주문", 
-    "📋 전체 주문 목록 & 달력", 
-    "🎂 고객 관리", 
-    "🔔 알림 현황", 
-    "📥 데이터 백업"
-])
-
-with tab1:
+if menu == "신규 주문":
     st.markdown('<div class="section-title">📝 신규 주문 및 고객 등록</div>', unsafe_allow_html=True)
     now_kst = get_kst_now()
 
@@ -160,7 +141,7 @@ with tab1:
                 st.session_state.orders.append(new_order)
                 st.success(f"'{cust_name}'님의 주문이 성공적으로 저장되었습니다!")
 
-with tab2:
+elif menu == "전체 주문 목록 & 달력":
     st.markdown('<div class="section-title">📋 전체 주문 목록 & 월간 캘린더</div>', unsafe_allow_html=True)
     
     if st.session_state.orders:
@@ -170,7 +151,7 @@ with tab2:
         with col_y:
             sel_year = st.selectbox("연도 선택", [2025, 2026, 2027], index=1)
         with col_m:
-            sel_month = st.selectbox("월 선택", list(range(1, 13)), index=now_kst.month - 1)
+            sel_month = st.selectbox("월 선택", list(range(1, 13)), index=get_kst_now().month - 1)
             
         st.write(f"### 📅 {sel_year}년 {sel_month}월 캘린더 뷰")
         
@@ -201,7 +182,6 @@ with tab2:
         st.divider()
         st.subheader("📋 전체 주문 상세 내역")
         
-        # 선택된 날짜가 있다면 필터링해서 보여주기
         if 'selected_cal_date' in st.session_state and st.session_state['selected_cal_date']:
             sel_date = st.session_state['selected_cal_date']
             st.info(f"🔍 현재 **{sel_date}** 픽업 주문 내역을 필터링하여 표시 중입니다.")
@@ -213,9 +193,9 @@ with tab2:
         else:
             st.dataframe(df_orders, use_container_width=True)
     else:
-        st.info("등록된 주문 내역이 없습니다. '신규 주문' 탭에서 첫 주문을 등록해 보세요!")
+        st.info("등록된 주문 내역이 없습니다. '신규 주문' 메뉴에서 첫 주문을 등록해 보세요!")
 
-with tab3:
+elif menu == "고객 관리":
     st.markdown('<div class="section-title">🎂 고객 관리</div>', unsafe_allow_html=True)
     if st.session_state.orders:
         df_cust = pd.DataFrame(st.session_state.orders)[["고객성명", "휴대폰번호", "주문상품명", "결제금액", "접수일시"]]
@@ -223,11 +203,11 @@ with tab3:
     else:
         st.info("등록된 고객 정보가 없습니다.")
 
-with tab4:
+elif menu == "알림 현황":
     st.markdown('<div class="section-title">🔔 알림 발송 현황</div>', unsafe_allow_html=True)
     st.info("픽업 안내 및 기념일 알림 발송 내역을 관리하는 공간입니다.")
 
-with tab5:
+elif menu == "데이터 백업":
     st.markdown('<div class="section-title">📥 데이터 CSV 백업</div>', unsafe_allow_html=True)
     st.write("저장된 전체 주문 및 고객 데이터를 CSV 파일로 다운로드합니다.")
     if st.session_state.orders:
