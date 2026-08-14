@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, time
 import pytz
 from sqlalchemy import create_engine, text
+from streamlit_calendar import calendar
 
 # 브라우저 탭 타이틀
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리 시스템", layout="wide", page_icon="💐")
@@ -108,7 +109,7 @@ if engine:
                     except Exception as e:
                         st.error(f"저장 실패: {e}")
 
-    # 2. 주문 내역 관리 (수정/삭제)
+    # 2. 주문 내역 관리 (수정/삭제 + 달력)
     elif menu == "📋 주문 내역 관리 (수정/삭제)":
         st.header("📋 전체 주문 내역 및 수정/삭제")
         
@@ -130,31 +131,60 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
-            display_df = df_orders.rename(columns={
-                'id': '주문ID',
-                'customer_name': '고객명',
-                'phone': '연락처',
-                'product_name': '상품명',
-                'amount': '금액',
-                'created_at': '접수일시',
-                'pickup_datetime': '픽업일시',
-                'status': '상태'
-            }).drop(columns=['customer_id'], errors='ignore')
+            tab1, tab2 = st.columns([1, 1])
             
-            # 💡 행 클릭 시 세션 상태 연동 설정
-            st.info("💡 아래 주문 목록에서 **행을 클릭**하면 하단 수정창에 해당 주문이 바로 채워집니다.")
-            event = st.dataframe(
-                display_df, 
-                use_container_width=True,
-                selection_mode="single-row",
-                on_select="rerun"
-            )
+            # 탭으로 달력 뷰 / 목록 뷰 구분
+            tab_list, tab_cal = st.tabs(["📊 목록 뷰 (행 클릭 선택)", "📅 캘린더 뷰"])
             
-            # 클릭한 행의 index 구하기
-            selected_id = None
-            if event and event.get("selection") and event["selection"].get("rows"):
-                selected_row_index = event["selection"]["rows"][0]
-                selected_id = df_orders.iloc[selected_row_index]['id']
+            with tab_list:
+                display_df = df_orders.rename(columns={
+                    'id': '주문ID',
+                    'customer_name': '고객명',
+                    'phone': '연락처',
+                    'product_name': '상품명',
+                    'amount': '금액',
+                    'created_at': '접수일시',
+                    'pickup_datetime': '픽업일시',
+                    'status': '상태'
+                }).drop(columns=['customer_id'], errors='ignore')
+                
+                st.info("💡 아래 주문 목록에서 **행을 클릭**하면 하단 수정창에 해당 주문이 바로 채워집니다.")
+                event = st.dataframe(
+                    display_df, 
+                    use_container_width=True,
+                    selection_mode="single-row",
+                    on_select="rerun"
+                )
+                
+                selected_id = None
+                if event and event.get("selection") and event["selection"].get("rows"):
+                    selected_row_index = event["selection"]["rows"][0]
+                    selected_id = df_orders.iloc[selected_row_index]['id']
+
+            with tab_cal:
+                st.subheader("📅 픽업 / 배송 달력")
+                calendar_events = []
+                for _, row in df_orders.iterrows():
+                    # 픽업 일시가 있는 경우
+                    if pd.notnull(row['pickup_datetime']):
+                        p_dt = pd.to_datetime(row['pickup_datetime'])
+                        status_color = "#3182ce" if row['status'] == '접수' else "#dd6b20" if row['status'] == '제작중' else "#38a169" if row['status'] == '완료' else "#e53e3e"
+                        calendar_events.append({
+                            "title": f"[{row['status']}] {row['customer_name']} - {row['product_name']}",
+                            "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "backgroundColor": status_color,
+                            "borderColor": status_color
+                        })
+                
+                calendar_options = {
+                    "headerToolbar": {
+                        "left": "prev,next today",
+                        "center": "title",
+                        "right": "dayGridMonth,timeGridWeek,timeGridDay"
+                    },
+                    "initialView": "dayGridMonth",
+                }
+                calendar(events=calendar_events, options=calendar_options)
 
             if not df_orders.empty:
                 st.markdown("---")
@@ -162,8 +192,8 @@ if engine:
                 
                 order_ids = df_orders['id'].tolist()
                 
-                # 클릭 선택이 있으면 해당 ID, 없으면 첫 번째 ID 사용
-                default_index = order_ids.index(selected_id) if selected_id in order_ids else 0
+                # 목록에서 클릭한 ID가 있을 경우 자동 선택, 없으면 첫번째
+                default_index = order_ids.index(selected_id) if (selected_id is not None and selected_id in order_ids) else 0
                 chosen_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", order_ids, index=default_index)
                 
                 selected_row = df_orders[df_orders['id'] == chosen_id].iloc[0]
@@ -255,7 +285,6 @@ if engine:
                 st.rerun()
                 
         try:
-            # DB에 없는 memo 컬럼 제거하여 에러 수정
             df_customers = pd.read_sql("SELECT id as ID, name as 고객명, phone as 연락처 FROM customers ORDER BY id DESC", engine)
             st.dataframe(df_customers, use_container_width=True)
         except Exception as e:
