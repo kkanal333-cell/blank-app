@@ -192,7 +192,7 @@ elif menu == "전체 주문 목록 & 달력":
         else:
             st.dataframe(df_orders, use_container_width=True)
             
-        # 주문 수정 및 삭제 구역
+        # 주문 수정 및 삭제 구역 (모든 항목 수정 가능하도록 완벽 복구)
         st.divider()
         st.markdown("#### ✏️ 주문 수정 및 삭제 관리")
         order_options = [f"{idx}: {o['고객성명']} ({o['주문상품명']} - {o['픽업일시']})" for idx, o in enumerate(st.session_state.orders)]
@@ -202,12 +202,49 @@ elif menu == "전체 주문 목록 & 달력":
             selected_idx = int(selected_order_str.split(":")[0])
             target_order = st.session_state.orders[selected_idx]
             
+            product_list = ["꽃다발", "꽃바구니", "용돈박스", "화분", "근조화환", "축하화환", "기타"]
+            p_idx = product_list.index(target_order["주문상품명"]) if target_order["주문상품명"] in product_list else 0
+            
+            pay_list = ["네이버", "전화", "입금", "현금", "카드"]
+            pay_idx = pay_list.index(target_order["결제내역"]) if target_order["결제내역"] in pay_list else 0
+
             with st.form("edit_form"):
                 st.write(f"**[ {target_order['고객성명']}님 주문 수정 ]**")
-                e_name = st.text_input("고객 성명", value=target_order["고객성명"])
-                e_phone = st.text_input("휴대폰 번호", value=target_order["휴대폰번호"])
-                e_prod = st.selectbox("주문 상품명", ["꽃다발", "꽃바구니", "용돈박스", "화분", "근조화환", "축하화환", "기타"], index=["꽃다발", "꽃바구니", "용돈박스", "화분", "근조화환", "축하화환", "기타"].index(target_order["주문상품명"]) if target_order["주문상품명"] in ["꽃다발", "꽃바구니", "용돈박스", "화분", "근조화환", "축하화환", "기타"] else 0)
-                e_price = st.number_input("결제 금액 (원)", value=int(target_order["결제금액"]), step=1000)
+                
+                e1, e2 = st.columns(2)
+                with e1: e_name = st.text_input("고객 성명", value=target_order["고객성명"])
+                with e2: e_phone = st.text_input("휴대폰 번호", value=target_order["휴대폰번호"])
+                
+                e3, e4 = st.columns(2)
+                with e3: e_prod = st.selectbox("주문 상품명", product_list, index=p_idx)
+                with e4: e_price = st.number_input("결제 금액 (원)", value=int(target_order["결제금액"]), step=1000)
+                
+                # 기존 픽업일시 파싱 시도
+                try:
+                    p_date_str, p_rest = target_order["픽업일시"].split(" ", 1)
+                    default_p_date = datetime.strptime(p_date_str, "%Y-%m-%d").date()
+                except:
+                    default_p_date = now_kst.date()
+
+                ep1, ep2, ep3 = st.columns([2.2, 1, 1.4])
+                with ep1: e_p_date = st.date_input("픽업 일자", value=default_p_date)
+                with ep2: e_p_period = st.selectbox("픽업 오전오후", ["AM", "PM"], index=1 if "PM" in target_order["픽업일시"] else 0)
+                with ep3: e_p_time = st.time_input("픽업 시간", value=time(14, 0))
+
+                # 접수일시 파싱 시도
+                try:
+                    o_date_str, o_time_str = target_order["접수일시"].split(" ", 1)
+                    default_o_date = datetime.strptime(o_date_str, "%Y-%m-%d").date()
+                    default_o_time = datetime.strptime(o_time_str, "%H:%M").time()
+                except:
+                    default_o_date = now_kst.date()
+                    default_o_time = now_kst.time()
+
+                eo1, eo2 = st.columns(2)
+                with eo1: e_o_date = st.date_input("접수 일자", value=default_o_date)
+                with eo2: e_o_time = st.time_input("접수 시간", value=default_o_time)
+
+                e_pay = st.selectbox("결제내역", pay_list, index=pay_idx)
                 e_memo = st.text_area("메모", value=target_order["메모"])
                 
                 col_sub1, col_sub2 = st.columns(2)
@@ -222,6 +259,10 @@ elif menu == "전체 주문 목록 & 달력":
                         "휴대폰번호": e_phone,
                         "주문상품명": e_prod,
                         "결제금액": e_price,
+                        "픽업일자": str(e_p_date),
+                        "픽업일시": f"{e_p_date} {e_p_period} {e_p_time.strftime('%H:%M')}",
+                        "접수일시": f"{e_o_date} {e_o_time.strftime('%H:%M')}",
+                        "결제내역": e_pay,
                         "메모": e_memo
                     })
                     st.success("주문 정보가 성공적으로 수정되었습니다!")
