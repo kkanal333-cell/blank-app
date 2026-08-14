@@ -5,8 +5,26 @@ import pytz
 from sqlalchemy import create_engine, text
 from streamlit_calendar import calendar
 
-# 브라우저 탭 타이틀
+# 브라우저 탭 타이틀 & 파스텔 테마 스타일 설정
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리 시스템", layout="wide", page_icon="💐")
+
+# 파스텔 / 보라 톤 CSS 스타일링
+st.markdown("""
+<style>
+    /* 메인 타이틀 파스텔 보라 포인트 */
+    h1 {
+        color: #6B46C1 !important;
+    }
+    h2, h3 {
+        color: #805AD5 !important;
+    }
+    /* 버튼 및 강조 요소 은은한 보라 스타일 */
+    .stButton>button {
+        border-radius: 8px;
+        border: 1px solid #D6BCFA;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # 대한민국 한국 표준시(KST) 설정
 def get_kst_now():
@@ -75,7 +93,7 @@ if engine:
                     
                 status = st.selectbox("상태", ["접수", "제작중", "배송중", "완료", "취소"])
             
-            submit = st.form_submit_button("주문 저장하기", use_container_width=True)
+            submit = st.form_submit_button("🌸 주문 저장하기", use_container_width=True)
             if submit:
                 if not customer_name or not product_name:
                     st.warning("고객 이름과 주문 상품명은 필수 입력 항목입니다.")
@@ -131,37 +149,73 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
+            # --- 파스텔 톤 상태별 칼라 맵핑 ---
+            # 접수: 연보라(#B39DDB), 제작중: 파스텔핑크(#F48FB1), 배송중/완료: 파스텔민트(#80CBC4), 취소: 차분한 회갈색(#BCAAA4)
+            def get_pastel_color(status):
+                if status == '접수':
+                    return "#9FA8DA"  # 라벤더 블루
+                elif status == '제작중':
+                    return "#CE93D8"  # 소프트 퍼플/핑크
+                elif status == '배송중':
+                    return "#80DEEA"  # Soft 파스텔 민트
+                elif status == '완료':
+                    return "#A5D6A7"  # Soft 파스텔 그린
+                else:
+                    return "#B0BEC5"  # Soft 세이지 그레이
+
             # --- 1. 📅 픽업/배송 달력 (상단 배치) ---
             st.subheader("📅 픽업 / 배송 달력")
+            st.caption("💡 달력에서 날짜를 클릭하면 아래 표에 해당 날짜의 주문이 자동으로 정렬됩니다.")
+            
             calendar_events = []
             for _, row in df_orders.iterrows():
                 if pd.notnull(row['pickup_datetime']):
                     p_dt = pd.to_datetime(row['pickup_datetime'])
-                    status_color = "#3182ce" if row['status'] == '접수' else "#dd6b20" if row['status'] == '제작중' else "#38a169" if row['status'] == '완료' else "#e53e3e"
+                    color = get_pastel_color(row['status'])
                     calendar_events.append({
                         "title": f"[{row['status']}] {row['customer_name']} - {row['product_name']}",
                         "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
-                        "backgroundColor": status_color,
-                        "borderColor": status_color
+                        "backgroundColor": color,
+                        "borderColor": color,
+                        "textColor": "#2C3E50"  # 글씨는 잘 보이도록 다크그레이
                     })
             
             calendar_options = {
                 "headerToolbar": {
                     "left": "prev,next today",
                     "center": "title",
-                    "right": "dayGridMonth,timeGridWeek,timeGridDay"
+                    "right": ""  # month, week, day 버튼 제거 요청 반영
                 },
                 "initialView": "dayGridMonth",
-                "height": 650
+                "height": 620,
+                "selectable": True
             }
-            # 달력 컴포넌트 출력
-            calendar(events=calendar_events, options=calendar_options, key="pickup_calendar")
+            
+            # 달력 클릭 이벤트 받기
+            cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_pastel")
+            
+            clicked_date_str = None
+            if cal_res and cal_res.get("dateClick"):
+                clicked_date_str = cal_res["dateClick"]["date"].split("T")[0]
             
             st.markdown("---")
             
             # --- 2. 📊 주문 목록 (표 형태) ---
-            st.subheader("📊 주문 목록 (행 클릭 선택)")
-            display_df = df_orders.rename(columns={
+            if clicked_date_str:
+                st.subheader(f"📊 {clicked_date_str} 픽업 주문 목록")
+                if st.button("🔄 전체 주문 목록 다시 보기"):
+                    clicked_date_str = None
+                    st.rerun()
+            else:
+                st.subheader("📊 전체 주문 목록 (행 클릭시 하단폼 자동 입력)")
+            
+            # 날짜 클릭시 필터링 적용
+            filtered_df = df_orders.copy()
+            if clicked_date_str:
+                filtered_df['pickup_date_only'] = pd.to_datetime(filtered_df['pickup_datetime']).dt.strftime('%Y-%m-%d')
+                filtered_df = filtered_df[filtered_df['pickup_date_only'] == clicked_date_str]
+            
+            display_df = filtered_df.rename(columns={
                 'id': '주문ID',
                 'customer_name': '고객명',
                 'phone': '연락처',
@@ -170,9 +224,8 @@ if engine:
                 'created_at': '접수일시',
                 'pickup_datetime': '픽업일시',
                 'status': '상태'
-            }).drop(columns=['customer_id'], errors='ignore')
+            }).drop(columns=['customer_id', 'pickup_date_only'], errors='ignore')
             
-            st.info("💡 아래 표에서 수정하고 싶은 주문 **행을 클릭**하면 하단 수정창에 내용이 즉시 입력됩니다.")
             event = st.dataframe(
                 display_df, 
                 use_container_width=True,
@@ -183,7 +236,8 @@ if engine:
             selected_id = None
             if event and event.get("selection") and event["selection"].get("rows"):
                 selected_row_index = event["selection"]["rows"][0]
-                selected_id = df_orders.iloc[selected_row_index]['id']
+                if selected_row_index < len(filtered_df):
+                    selected_id = filtered_df.iloc[selected_row_index]['id']
 
             # --- 3. ✏️ 주문 수정 및 삭제 ---
             if not df_orders.empty:
