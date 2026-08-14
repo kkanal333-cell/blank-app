@@ -8,10 +8,24 @@ from streamlit_calendar import calendar
 # 페이지 기본 설정
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리", layout="wide", page_icon="💐")
 
-# 세련된 Pretendard 고딕 폰트 및 소프트 파스텔 CSS 적용
+# 모바일 화면 최적화를 위한 상단 여백 대폭 축소 CSS 적용
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+    /* 상단 기본 여백 최소화 (여백 없애기) */
+    .main .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+    }
+    
+    /* 헤더 패딩 축소 */
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
+        height: 2.5rem !important;
+    }
 
     /* 모바일/PC 사이드바 버튼 및 토글 항상 보이도록 지정 */
     [data-testid="stSidebarNav"] {
@@ -29,21 +43,24 @@ st.markdown("""
         color: #2D3748;
     }
 
-    /* 제목 크기 단정하게 축소 */
+    /* 메인 타이틀 크기 및 여백 슬림화 */
     h1 {
-        font-size: 1.5rem !important;
+        font-size: 1.3rem !important;
         font-weight: 700 !important;
         color: #582C83 !important;
-        margin-bottom: 0.8rem !important;
+        margin-top: 0rem !important;
+        margin-bottom: 0.5rem !important;
+        padding-top: 0rem !important;
     }
     h2 {
-        font-size: 1.2rem !important;
+        font-size: 1.1rem !important;
         font-weight: 600 !important;
         color: #4A5568 !important;
-        margin-top: 0.8rem !important;
+        margin-top: 0.4rem !important;
+        margin-bottom: 0.4rem !important;
     }
     h3 {
-        font-size: 1.0rem !important;
+        font-size: 0.95rem !important;
         font-weight: 600 !important;
         color: #4A5568 !important;
     }
@@ -78,7 +95,7 @@ st.markdown("""
         color: #3D1C5C !important;
     }
     .fc-toolbar-title {
-        font-size: 1.1rem !important;
+        font-size: 1.0rem !important;
         font-weight: 700 !important;
         color: #4A5568 !important;
     }
@@ -89,9 +106,9 @@ st.markdown("""
         background-color: #FAF5FF !important;
     }
     
-    /* 탭 스타일 */
+    /* 탭 스타일 및 여백 줄이기 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 4px;
     }
     .stTabs [aria-selected="true"] {
         color: #582C83 !important;
@@ -269,11 +286,11 @@ if engine:
                 calendar_options = {
                     "headerToolbar": {"left": "prev,next today", "center": "title", "right": ""},
                     "initialView": "dayGridMonth",
-                    "height": 580,
+                    "height": 550,
                     "selectable": True
                 }
                 
-                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v11")
+                cal_res = calendar(events=calendar_events, options=calendar_options, key="pickup_calendar_v12")
                 
                 clicked_date_str = None
                 if cal_res and cal_res.get("dateClick"):
