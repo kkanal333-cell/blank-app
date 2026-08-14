@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime, time
 import pytz
 from sqlalchemy import create_engine, text
-from streamlit_calendar import calendar
 
 # 브라우저 탭 타이틀
 st.set_page_config(page_title="화사한 하루 - 고객/주문 관리 시스템", layout="wide", page_icon="💐")
@@ -109,7 +108,7 @@ if engine:
                     except Exception as e:
                         st.error(f"저장 실패: {e}")
 
-    # 2. 주문 내역 관리 (수정/삭제 + 달력)
+    # 2. 주문 내역 관리 (수정/삭제)
     elif menu == "📋 주문 내역 관리 (수정/삭제)":
         st.header("📋 전체 주문 내역 및 수정/삭제")
         
@@ -131,10 +130,9 @@ if engine:
             """
             df_orders = pd.read_sql(query, engine)
             
-            tab1, tab2 = st.columns([1, 1])
+            tab_list, tab_date = st.tabs(["📊 전체 목록 (행 클릭 선택)", "📅 날짜별 픽업 검색"])
             
-            # 탭으로 달력 뷰 / 목록 뷰 구분
-            tab_list, tab_cal = st.tabs(["📊 목록 뷰 (행 클릭 선택)", "📅 캘린더 뷰"])
+            selected_id = None
             
             with tab_list:
                 display_df = df_orders.rename(columns={
@@ -156,35 +154,33 @@ if engine:
                     on_select="rerun"
                 )
                 
-                selected_id = None
                 if event and event.get("selection") and event["selection"].get("rows"):
                     selected_row_index = event["selection"]["rows"][0]
                     selected_id = df_orders.iloc[selected_row_index]['id']
 
-            with tab_cal:
-                st.subheader("📅 픽업 / 배송 달력")
-                calendar_events = []
-                for _, row in df_orders.iterrows():
-                    # 픽업 일시가 있는 경우
-                    if pd.notnull(row['pickup_datetime']):
-                        p_dt = pd.to_datetime(row['pickup_datetime'])
-                        status_color = "#3182ce" if row['status'] == '접수' else "#dd6b20" if row['status'] == '제작중' else "#38a169" if row['status'] == '완료' else "#e53e3e"
-                        calendar_events.append({
-                            "title": f"[{row['status']}] {row['customer_name']} - {row['product_name']}",
-                            "start": p_dt.strftime("%Y-%m-%dT%H:%M:%S"),
-                            "backgroundColor": status_color,
-                            "borderColor": status_color
-                        })
+            with tab_date:
+                st.subheader("📅 날짜별 픽업/배송 일정 조회")
+                filter_date = st.date_input("조회할 픽업 날짜 선택", get_kst_now().date())
                 
-                calendar_options = {
-                    "headerToolbar": {
-                        "left": "prev,next today",
-                        "center": "title",
-                        "right": "dayGridMonth,timeGridWeek,timeGridDay"
-                    },
-                    "initialView": "dayGridMonth",
-                }
-                calendar(events=calendar_events, options=calendar_options)
+                # 선택한 날짜에 해당하는 주문만 필터링
+                if not df_orders.empty:
+                    df_orders['pickup_date_only'] = pd.to_datetime(df_orders['pickup_datetime']).dt.date
+                    filtered_df = df_orders[df_orders['pickup_date_only'] == filter_date]
+                    
+                    if not filtered_df.empty:
+                        disp_filter = filtered_df.rename(columns={
+                            'id': '주문ID',
+                            'customer_name': '고객명',
+                            'phone': '연락처',
+                            'product_name': '상품명',
+                            'amount': '금액',
+                            'created_at': '접수일시',
+                            'pickup_datetime': '픽업일시',
+                            'status': '상태'
+                        }).drop(columns=['customer_id', 'pickup_date_only'], errors='ignore')
+                        st.dataframe(disp_filter, use_container_width=True)
+                    else:
+                        st.warning(f"{filter_date}에 예약된 픽업/배송 주문이 없습니다.")
 
             if not df_orders.empty:
                 st.markdown("---")
@@ -192,7 +188,6 @@ if engine:
                 
                 order_ids = df_orders['id'].tolist()
                 
-                # 목록에서 클릭한 ID가 있을 경우 자동 선택, 없으면 첫번째
                 default_index = order_ids.index(selected_id) if (selected_id is not None and selected_id in order_ids) else 0
                 chosen_id = st.selectbox("수정 또는 삭제할 주문 번호(ID) 선택", order_ids, index=default_index)
                 
