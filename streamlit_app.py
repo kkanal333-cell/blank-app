@@ -8,22 +8,22 @@ st.set_page_config(page_title="화사한 하루", layout="wide")
 def get_kst_now():
     return datetime.now(pytz.timezone('Asia/Seoul'))
 
-# 버튼 기능은 유지하되 깨진 텍스트만 지우고 화살표 아이콘 부여
+# 자바스크립트로 깨진 텍스트를 찾아서 완벽한 SVG 화살표로 강제 교체
 fix_toggle_script = """
 <script>
-    function fixToggle() {
+    function injectArrow() {
         const doc = window.parent.document;
-        const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
-        let node;
-        while (node = walker.nextNode()) {
-            if (node.nodeValue && node.nodeValue.includes('keyboard_double')) {
-                node.nodeValue = ''; // 글씨만 깔끔하게 지움
+        const controls = doc.querySelectorAll('[data-testid="collapsedControl"]');
+        controls.forEach(el => {
+            // 내부 텍스트나 깨진 흔적이 있으면 지우고 SVG 화살표 삽입
+            if (!el.querySelector('svg') || el.innerText.includes('keyboard_double')) {
+                el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#582C83" width="24px" height="24px"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>';
             }
-        }
+        });
     }
-    const observer = new MutationObserver(fixToggle);
+    const observer = new MutationObserver(injectArrow);
     observer.observe(window.parent.document.body, { childList: true, subtree: true });
-    setInterval(fixToggle, 100);
+    setInterval(injectArrow, 100);
 </script>
 """
 components.html(fix_toggle_script, height=0, width=0)
@@ -34,17 +34,12 @@ st.markdown("""
     
     * { font-family: 'Pretendard', sans-serif !important; }
 
-    /* 사이드바 토글 버튼이 정상 작동하도록 보이게 하되 깨진 글씨 영역 조정 */
+    /* 사이드바 토글 버튼 스타일 확보 */
     [data-testid="collapsedControl"] {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-    }
-    [data-testid="collapsedControl"] svg {
-        fill: #582C83 !important;
-        width: 24px !important;
-        height: 24px !important;
-        display: block !important;
+        background-color: transparent !important;
     }
 
     /* 제목 글씨 크기 및 위치 정돈 */
