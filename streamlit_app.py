@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime, time
+from datetime import datetime, time, date
 import pytz
 import pandas as pd
 
@@ -90,7 +90,7 @@ st.markdown('<div class="app-title">💐 화사한 하루 고객 & 주문 관리
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📝 신규 주문", 
-    "📋 주문 목록", 
+    "📋 주문 목록 & 달력", 
     "🎂 고객 관리", 
     "🔔 알림 현황", 
     "📥 데이터 백업"
@@ -130,24 +130,29 @@ with tab1:
         st.form_submit_button("🌸 주문 저장하기", use_container_width=True)
 
 with tab2:
-    st.markdown('<div class="section-title">📋 전체 주문 목록 & 달력</div>', unsafe_allow_html=True)
-    st.text_input("🔍 고객명 또는 연락처 검색", placeholder="검색어를 입력하세요")
+    st.markdown('<div class="section-title">📋 전체 주문 목록 & 캘린더 뷰</div>', unsafe_allow_html=True)
     
-    # 샘플 데이터 테이블 표시
-    sample_data = pd.DataFrame({
-        "접수일시": ["2026-08-14 16:04", "2026-08-14 14:20"],
-        "고객명": ["김화사", "이플라워"],
-        "연락처": ["010-1234-5678", "010-9876-5432"],
-        "상품명": ["꽃다발", "꽃바구니"],
-        "금액": ["55,000원", "70,000원"],
-        "픽업일시": ["2026-08-14 PM 14:00", "2026-08-15 PM 13:00"],
-        "결제": ["네이버", "입금"]
-    })
-    st.dataframe(sample_data, use_container_width=True)
+    # 캘린더와 목록을 보기 좋게 분리
+    col_cal, col_list = st.columns([1, 1.2])
+    with col_cal:
+        st.subheader("📅 픽업 캘린더")
+        selected_date = st.date_input("날짜 선택", date.today(), label_visibility="collapsed")
+        st.info(f"📌 **{selected_date}** 픽업 예정 주문이 아래에 표시됩니다.")
+        
+    with col_list:
+        st.subheader("📋 주문 내역 상세")
+        sample_data = pd.DataFrame({
+            "고객명": ["김화사", "이플라워"],
+            "연락처": ["010-1234-5678", "010-9876-5432"],
+            "상품": ["꽃다발", "꽃바구니"],
+            "픽업시간": ["PM 14:00", "PM 13:00"],
+            "금액": ["55,000원", "70,000원"]
+        })
+        st.dataframe(sample_data, use_container_width=True)
 
 with tab3:
     st.markdown('<div class="section-title">🎂 고객 관리</div>', unsafe_allow_html=True)
-    st.text_input("🔍 등록된 고객 검색", placeholder="고객 이름 검색")
+    st.text_input("🔍 등록된 고객 검색", placeholder="고객 이름 또는 연락처 검색")
     customer_data = pd.DataFrame({
         "고객명": ["김화사", "이플라워"],
         "연락처": ["010-1234-5678", "010-9876-5432"],
